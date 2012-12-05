@@ -70,25 +70,27 @@ static std::string default_debug(std::ostream &stream, const Node *node)
     return name;
 }
 
-// TODO: handle doubles
-static uint64_t to_number(const std::string &text)
+static bool to_number(const std::string &text, Value &value)
 {
     if (text.empty())
         return 0;
-    uint64_t ret;
+    std::istringstream ss(text);
     if (text.size() < 3) {
-        std::istringstream ss(text);
-        ss >> std::dec >> ret;
+        ss >> std::dec >> value.uint_val;
     } else {
         if (text[0] == '0' && text[1] == 'x') {
-            std::istringstream ss(text.substr(2, text.size()));
-            ss >> std::hex >> ret;
+            ss.str(text.substr(2, text.size()));
+            ss >> std::hex >> value.uint_val;
+        } else if (text.find(".") != std::string::npos) {
+            ss >> value.double_val;
         } else {
-            std::istringstream ss(text.substr(2, text.size()));
-            ss >> std::dec >> ret;
+            ss >> std::dec >> value.uint_val;
         }
     }
-    return ret;
+    char c;
+    if (ss.fail() || ss.get(c))
+        return false;
+    return true;
 }
 
 template <typename Match>
@@ -104,7 +106,7 @@ static void literal(Match &match, Node &node)
 
     case lexer::NUMBER_LITERAL:
         node.name = "NUMBER";
-        node.value.uint_val = ::ast::to_number(node.text);
+        ::ast::to_number(node.text, node.value);
         break;
 
     case lexer::STRING_LITERAL:

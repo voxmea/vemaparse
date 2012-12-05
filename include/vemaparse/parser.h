@@ -92,6 +92,7 @@ struct Rule
     bool must_consume_token;
     Rule *left, *right;
     std::function<void(Match &, ast::Node &)> action;
+    std::function<bool(Match &)> check;
     std::function<rule_result(Iterator, Iterator)> match_;
 
     // Match behavior:
@@ -106,6 +107,11 @@ struct Rule
         ret.match.begin = token_pos;
         ret.match.rule = *this;
         ret.match.action = action;
+        if (check) {
+            ret.matched = check(ret.match);
+            if (!ret.matched)
+                ret.match.end = token_pos;
+        }
         return ret;
     }
 
@@ -126,6 +132,12 @@ struct Rule
     Rule &operator [](std::function<void(Match &, ast::Node &)> callable)
     {
         action = callable;
+        return *this;
+    }
+
+    Rule &operator ()(std::function<bool(Match &)> callable)
+    {
+        check = callable;
         return *this;
     }
 };
@@ -170,7 +182,8 @@ Rule<Iterator> &operator >>(Rule<Iterator> &first, Rule<Iterator> &second)
 {
     Rule<Iterator> &rule = *new Rule<Iterator>("order", &first, &second);
     rule.must_consume_token = first.must_consume_token || second.must_consume_token;
-    rule.match_ = [&rule](Iterator token_pos, Iterator eos) -> typename Rule<Iterator>::rule_result {
+    rule.match_ = [&rule](Iterator token_pos, Iterator eos) -> typename Rule<Iterator>::rule_result 
+    {
         typename Rule<Iterator>::rule_result ret, tmp;
         ret = rule.left->match(token_pos, eos);
         if (ret.matched) {
@@ -191,9 +204,12 @@ Rule<Iterator> &operator |(Rule<Iterator> &first, Rule<Iterator> &second)
 {
     Rule<Iterator> &rule = *new Rule<Iterator>("or", &first, &second);
     rule.must_consume_token = first.must_consume_token || second.must_consume_token;
-    rule.match_ = [&rule](Iterator token_pos, Iterator eos) -> typename Rule<Iterator>::rule_result { 
+    rule.match_ = [&rule](Iterator token_pos, Iterator eos) -> typename Rule<Iterator>::rule_result 
+    { 
         typename Rule<Iterator>::rule_result ret, tmp;
         tmp = rule.left->match(token_pos, eos);
+        // TODO: if both fail should we propagate all the child info? 
+        // Just the failure with the most children?
         if (tmp.matched) {
             propagate_child_info(ret, tmp);
             return ret;
@@ -211,7 +227,8 @@ Rule<Iterator> &operator *(Rule<Iterator> &first)
 {
     Rule<Iterator> &rule = *new Rule<Iterator>(std::string("kleene->")+first.name, &first);
     rule.must_consume_token = false;
-    rule.match_ = [&rule](Iterator token_pos, Iterator eos) -> typename Rule<Iterator>::rule_result {
+    rule.match_ = [&rule](Iterator token_pos, Iterator eos) -> typename Rule<Iterator>::rule_result 
+    {
         typename Rule<Iterator>::rule_result ret, tmp;
         ret.match.end = tmp.match.end = token_pos;
         tmp.matched = true;
@@ -231,7 +248,8 @@ Rule<Iterator> &operator /(Rule<Iterator> &first, Rule<Iterator> &second)
 {
     Rule<Iterator> &rule = *new Rule<Iterator>("non-greedy kleene", &first, &second);
     rule.must_consume_token = first.must_consume_token || second.must_consume_token;
-    rule.match_ = [&rule](Iterator token_pos, Iterator eos) -> typename Rule<Iterator>::rule_result {
+    rule.match_ = [&rule](Iterator token_pos, Iterator eos) -> typename Rule<Iterator>::rule_result 
+    {
         typename Rule<Iterator>::rule_result ret, tmp;
         ret.matched = true;
         tmp.match.end = token_pos;
@@ -243,8 +261,11 @@ Rule<Iterator> &operator /(Rule<Iterator> &first, Rule<Iterator> &second)
                 break;
             }
             tmp = rule.left->match(start_pos, eos);
-            if (!tmp.matched)
-                return typename Rule<Iterator>::rule_result(false, token_pos);
+            propagate_child_info(ret, tmp);
+            if (!tmp.matched) {
+                ret.match.end = token_pos;
+                break;
+            }
             propagate_child_info(ret, tmp);
         }
         return ret;
@@ -258,7 +279,8 @@ Rule<Iterator> &operator -(Rule<Iterator> &first)
 {
     Rule<Iterator> &rule = *new Rule<Iterator>("optional", &first);
     rule.must_consume_token = false;
-    rule.match_ = [&rule](Iterator token_pos, Iterator eos) -> typename Rule<Iterator>::rule_result { 
+    rule.match_ = [&rule](Iterator token_pos, Iterator eos) -> typename Rule<Iterator>::rule_result 
+    {
         if (token_pos == eos)
             return typename Rule<Iterator>::rule_result(true, eos);
         typename Rule<Iterator>::rule_result ret, tmp = rule.left->match(token_pos, eos);

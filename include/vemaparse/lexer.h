@@ -188,7 +188,7 @@ private:
         // numbers - check for illegal numbers later
         if (std::isdigit(*cur, locale)) {
             Iterator begin_pos = cur++;
-            while (cur != end_pos && (std::isxdigit(*cur, locale) || (*cur == 'x')))
+            while (cur != end_pos && (std::isxdigit(*cur, locale) || (*cur == 'x') || (*cur == '.')))
                 ++cur;
             return LexerIterator<Iterator>(this, NUMBER_LITERAL, begin_pos, cur);
         }
