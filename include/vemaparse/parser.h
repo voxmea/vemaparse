@@ -10,7 +10,16 @@
 #include <deque>
 #include <algorithm>
 #include <memory>
+
+#ifdef _MSC_VER
+#pragma warning(push, 1)
+#pragma warning(disable:4702)
+#endif
 #include <boost/xpressive/xpressive.hpp>
+#ifdef _MSC_VER
+#pragma warning(default:4996)
+#pragma warning(pop)
+#endif
 
 namespace ast
 {
