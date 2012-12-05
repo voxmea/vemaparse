@@ -92,7 +92,7 @@ Example::
       }
       if (match.action || parent->text != match_string) {
           node = new Node();
-          node->name = boost::xpressive::regex_replace(match.rule.name, boost::xpressive::sregex::compile(" |-"), std::string("_"));
+          node->name = boost::xpressive::regex_replace(match.rule.name, boost::xpressive::sregex::compile(" |-|>"), std::string("_"));
           node->text = match_string;
           parent->children.push_back(node);
       }
