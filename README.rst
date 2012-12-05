@@ -5,15 +5,16 @@ vemaparse
 Simple recursive descent parser.
 
 Example::
+
   #include <vemaparse/lexer.h>
   #include <vemaparse/parser.h>
   #include <vemaparse/ast.h>
-   
+  
   using namespace ast;
-   
+  
   typedef lexer::LexerIterator<std::string::iterator> parser_iterator_type;
   typedef parser::Rule<parser_iterator_type>::Match Match;
-   
+  
   parser::Rule<parser_iterator_type> &r(const std::string &regex, const std::string name = "")
   {
       auto &rule = parser::regex<parser_iterator_type>(regex);
@@ -78,7 +79,7 @@ Example::
   
       return *block;
   }
-
+  
   void visit_match(Match &match, Node *parent)
   {
       static const std::bitset<lexer::NUM_TOKENS> literals((1 << lexer::IDENTIFIER) | 
