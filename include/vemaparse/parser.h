@@ -266,7 +266,6 @@ Rule<Iterator> &operator /(Rule<Iterator> &first, Rule<Iterator> &second)
                 ret.match.end = token_pos;
                 break;
             }
-            propagate_child_info(ret, tmp);
         }
         return ret;
     };
