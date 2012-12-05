@@ -102,7 +102,15 @@ struct Rule
     {
         if (must_consume_token && token_pos == eos)
             return rule_result(false, eos);
-        auto ret = match_(token_pos, eos);
+        rule_result ret;
+        try {
+            ret = match_(token_pos, eos);
+        } catch (const lexer::LexerError &ex) {
+            std::cerr << "ERROR: " << ex.what() << std::endl;
+            ret.matched = false;
+            ret.match.end = token_pos;
+            return ret;
+        }
         assert(ret.matched || ret.match.end == token_pos);
         ret.match.begin = token_pos;
         ret.match.rule = *this;

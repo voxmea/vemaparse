@@ -37,20 +37,10 @@ enum Token
 
 template <typename Iterator> class Lexer;
 
-template <typename Iterator>
 struct LexerError : public std::exception
 {
     std::string message;
-
     LexerError(const std::string &error) : message(error) { }
-
-    LexerError(const std::string &error, Iterator begin, Iterator end)
-    {
-        while (begin != end)
-            message += *begin++;
-        message = error + message;
-    }
-
     const char *what() const NOEXCEPT
     {
         return message.c_str();
@@ -74,7 +64,7 @@ struct LexerIterator : public std::iterator<std::forward_iterator_tag, Iterator>
     std::string operator *() const
     {
         if (is_end) {
-            throw LexerError<Iterator>("dereferencing end iterator");
+            throw LexerError("dereferencing end iterator");
         }
         assert(begin != end);
         Iterator tmp = begin;
@@ -173,7 +163,7 @@ private:
                 ++cur;
             }
             if (cur == end_pos) 
-                throw LexerError<Iterator>("string literal not closed", begin_pos, cur);
+                throw LexerError("string literal not closed");
             return LexerIterator<Iterator>(this, STRING_LITERAL, begin_pos, ++cur);
         }
 
@@ -202,7 +192,7 @@ private:
         }
 
         Iterator begin_pos = cur++;
-        throw LexerError<Iterator>("unknown input type", begin_pos, cur);
+        throw LexerError("unknown input type");
 #if 0
         xp::sregex id = xp::sregex::compile("(?P<identifier>([a-z]|[A-Z]|'_')([a-z]|[A-Z]|[0-9]|'_')*)");
         xp::sregex op = xp::sregex::compile("(?P<operator>([^a-zA-Z0-9_\\s])+)");
