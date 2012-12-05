@@ -19,7 +19,7 @@ struct Node;
 
 struct Value
 {
-    enum 
+    enum ValueType
     {
         UINT_TYPE,
         DOUBLE_TYPE,
@@ -33,6 +33,7 @@ struct Value
         Node *function_val;
         std::string *string_val;
     };
+    ValueType type;
 };
 
 static std::string default_debug(std::ostream &stream, const Node *node);
@@ -75,6 +76,7 @@ static bool to_number(const std::string &text, Value &value)
     if (text.empty())
         return 0;
     std::istringstream ss(text);
+    value.type = Value::UINT_TYPE;
     if (text.size() < 3) {
         ss >> std::dec >> value.uint_val;
     } else {
@@ -83,6 +85,7 @@ static bool to_number(const std::string &text, Value &value)
             ss >> std::hex >> value.uint_val;
         } else if (text.find(".") != std::string::npos) {
             ss >> value.double_val;
+            value.type = Value::DOUBLE_TYPE;
         } else {
             ss >> std::dec >> value.uint_val;
         }
@@ -98,6 +101,7 @@ static void literal(Match &match, Node &node)
 {
     int token = match.begin.token;
     node.text = parser::to_string(match.begin, match.end);
+    node.value.type = Value::STRING_TYPE;
     switch (token) {
     case lexer::IDENTIFIER:
         node.value.string_val = &node.text;
