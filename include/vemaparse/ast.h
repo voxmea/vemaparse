@@ -114,9 +114,17 @@ static void literal(Match &match, Node &node)
         break;
 
     case lexer::STRING_LITERAL:
+    {
         node.name = "STRING";
-        node.value.string_val = &node.text;
+        std::string *s = new std::string();
+        *s = boost::xpressive::regex_replace(node.text, boost::xpressive::sregex::compile("(?<!\\\\)\""), std::string());
+        *s = boost::xpressive::regex_replace(*s, boost::xpressive::sregex::compile("(?<!\\\\)\\\\\""), std::string("\""));
+        *s = boost::xpressive::regex_replace(*s, boost::xpressive::sregex::compile("(?<!\\\\)\\\\n"), std::string("\n"));
+        *s = boost::xpressive::regex_replace(*s, boost::xpressive::sregex::compile("(?<!\\\\)\\\\r"), std::string("\r"));
+        std::cout << "got a string " << *s << std::endl;
+        node.value.string_val = s;
         break;
+    }
 
     default:
         std::cerr << "ERROR: unkown literal type\n";
