@@ -260,12 +260,14 @@ Rule<Iterator> &operator /(Rule<Iterator> &first, Rule<Iterator> &second)
     {
         typename Rule<Iterator>::rule_result ret, tmp;
         ret.matched = true;
+        bool matched_right_side = false;
         tmp.match.end = token_pos;
         while (tmp.match.end != eos) {
             Iterator start_pos = tmp.match.end;
             tmp = rule.right->match(start_pos, eos);
             if (tmp.matched) {
                 propagate_child_info(ret, tmp);
+                matched_right_side = true;
                 break;
             }
             tmp = rule.left->match(start_pos, eos);
@@ -274,6 +276,10 @@ Rule<Iterator> &operator /(Rule<Iterator> &first, Rule<Iterator> &second)
                 ret.match.end = token_pos;
                 break;
             }
+        }
+        if (!matched_right_side) {
+            ret.matched = false;
+            ret.match.end = token_pos;
         }
         return ret;
     };
