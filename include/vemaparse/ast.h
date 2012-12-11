@@ -8,6 +8,7 @@
 #include <sstream>
 #include <stdint.h>
 #include <boost/xpressive/xpressive.hpp>
+#include <boost/variant.hpp>
 
 #include "lexer.h"
 #include "parser.h"
@@ -15,26 +16,9 @@
 namespace ast
 {
 
-struct Node;
+struct Scope;
 
-struct Value
-{
-    enum ValueType
-    {
-        UINT_TYPE,
-        DOUBLE_TYPE,
-        FUNCTION_TYPE,
-        STRING_TYPE
-    };
-    union
-    {
-        uint64_t uint_val;
-        double double_val;
-        Node *function_val;
-        std::string *string_val;
-    };
-    ValueType type;
-};
+typedef boost::variant<uint64_t, double, Scope *, std::string> Value;
 
 static std::string default_debug(std::ostream &stream, const Node *node);
 
@@ -60,7 +44,8 @@ static std::string default_debug(std::ostream &stream, const Node *node)
     std::string name = ss.str();
 
     if (!node->text.empty()) {
-        stream << name << " [label=\"" << boost::xpressive::regex_replace(node->text, boost::xpressive::sregex::compile("\""), std::string("\\\"")) << "\"];" << std::endl;
+        std::string text = boost::xpressive::regex_replace(node->text, boost::xpressive::sregex::compile("(?<!\\\\)\""), std::string("\\\""));
+        stream << name << " [label=\"" << text << "\"];" << std::endl;
     }
 
     std::vector<std::string> names;
@@ -76,18 +61,24 @@ static bool to_number(const std::string &text, Value &value)
     if (text.empty())
         return 0;
     std::istringstream ss(text);
-    value.type = Value::UINT_TYPE;
     if (text.size() < 3) {
-        ss >> std::dec >> value.uint_val;
+        uint64_t tmp;
+        ss >> std::dec >> tmp;
+        value = tmp;
     } else {
         if (text[0] == '0' && text[1] == 'x') {
             ss.str(text.substr(2, text.size()));
-            ss >> std::hex >> value.uint_val;
+            uint64_t tmp;
+            ss >> std::hex >> tmp;
+            value = tmp;
         } else if (text.find(".") != std::string::npos) {
-            ss >> value.double_val;
-            value.type = Value::DOUBLE_TYPE;
+            double tmp;
+            ss >> tmp;
+            value = tmp;
         } else {
-            ss >> std::dec >> value.uint_val;
+            uint64_t tmp;
+            ss >> std::dec >> tmp;
+            value = tmp;
         }
     }
     char c;
@@ -101,10 +92,9 @@ static void literal(Match &match, Node &node)
 {
     int token = match.begin.token;
     node.text = parser::to_string(match.begin, match.end);
-    node.value.type = Value::STRING_TYPE;
     switch (token) {
     case lexer::IDENTIFIER:
-        node.value.string_val = &node.text;
+        node.value = node.text;
         node.name = "IDENTIFIER";
         break;
 
@@ -116,13 +106,11 @@ static void literal(Match &match, Node &node)
     case lexer::STRING_LITERAL:
     {
         node.name = "STRING";
-        std::string *s = new std::string();
-        *s = boost::xpressive::regex_replace(node.text, boost::xpressive::sregex::compile("(?<!\\\\)\""), std::string());
-        *s = boost::xpressive::regex_replace(*s, boost::xpressive::sregex::compile("(?<!\\\\)\\\\\""), std::string("\""));
-        *s = boost::xpressive::regex_replace(*s, boost::xpressive::sregex::compile("(?<!\\\\)\\\\n"), std::string("\n"));
-        *s = boost::xpressive::regex_replace(*s, boost::xpressive::sregex::compile("(?<!\\\\)\\\\r"), std::string("\r"));
-        std::cout << "got a string " << *s << std::endl;
-        node.value.string_val = s;
+        std::string s = boost::xpressive::regex_replace(node.text, boost::xpressive::sregex::compile("(?<!\\\\)\""), std::string());
+        s = boost::xpressive::regex_replace(s, boost::xpressive::sregex::compile("(?<!\\\\)\\\\\""), std::string("\""));
+        s = boost::xpressive::regex_replace(s, boost::xpressive::sregex::compile("(?<!\\\\)\\\\n"), std::string("\n"));
+        s = boost::xpressive::regex_replace(s, boost::xpressive::sregex::compile("(?<!\\\\)\\\\r"), std::string("\r"));
+        node.value = s;
         break;
     }
 

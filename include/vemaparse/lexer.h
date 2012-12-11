@@ -93,12 +93,11 @@ struct LexerIterator : public std::iterator<std::forward_iterator_tag, Iterator>
 template <typename Iterator>
 class Lexer
 {
-    template <typename I> friend struct LexerIterator;
+    template <typename> friend struct LexerIterator;
     Iterator begin_pos, end_pos;
     std::locale locale;
     bool skip_ws;
 
-public:
 private:
     LexerIterator<Iterator> next(const LexerIterator<Iterator> &iter) const
     {
