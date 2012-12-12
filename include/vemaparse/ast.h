@@ -3,8 +3,10 @@
 #define MEL_AST_H_
 
 #include <iostream>
+#include <list>
 #include <string>
 #include <functional>
+#include <memory>
 #include <sstream>
 #include <stdint.h>
 #include <boost/xpressive/xpressive.hpp>
@@ -21,36 +23,56 @@ struct Node;
 
 typedef boost::variant<uint64_t, double, Scope *, std::string> Value;
 
-static std::string default_debug(std::ostream &stream, const Node *node);
+static std::string default_debug(std::ostream &stream, const Node &node);
 
 struct Node
 {
+    typedef std::shared_ptr<Node> node_ptr;
+    enum Type
+    {
+        VALUE,
+        ASSIGNMENT,
+        EXPRESSION,
+        STRING_EXPRESSION,
+        NUM_TYPES,
+        INVALID = NUM_TYPES
+    };
     std::string text;
     std::string name;
     Value value;
     std::function<std::string(std::ostream &)> debug;
-    std::vector<Node *> children;
+    node_ptr parent;
+    typedef std::list<node_ptr>::iterator child_iterator_type;
+    std::list<node_ptr> children;
+    Type type;
 
-    Node() { debug = [this](std::ostream &s) {return default_debug(s, this);}; }
-    Node(const std::string text_, const Value &value_) 
-        : text(text_), value(value_)
-    { debug = [this](std::ostream &s) {return default_debug(s, this);}; }
+    Node() : type(INVALID) {debug = [this](std::ostream &s) {return default_debug(s, *this);};}
 };
 
-static std::string default_debug(std::ostream &stream, const Node *node)
+static std::string default_debug(std::ostream &stream, const Node &node)
 {
     static uint64_t counter = 0;
-    std::ostringstream ss;
-    ss << node->name << counter++;
-    std::string name = ss.str();
-
-    if (!node->text.empty()) {
-        std::string text = boost::xpressive::regex_replace(node->text, boost::xpressive::sregex::compile("(?<!\\\\)\""), std::string("\\\""));
-        stream << name << " [label=\"" << node->name << " - " << text << "\"];" << std::endl;
+    std::string name = boost::xpressive::regex_replace(node.name, boost::xpressive::sregex::compile(" |-|>|\n|\r|\\\\"), std::string("_"));
+    {
+        std::ostringstream ss;
+        ss << name << counter++;
+        name = ss.str();
     }
 
+    std::string label;
+    if (node.type == Node::VALUE) {
+        std::ostringstream ss;
+        ss << node.value;
+        label = ss.str();
+    } else if (!node.text.empty()) {
+        label = node.text;
+    }
+    label = boost::xpressive::regex_replace(label, boost::xpressive::sregex::compile("(?<!\\\\)\""), std::string("\\\""));
+    label = boost::xpressive::regex_replace(label, boost::xpressive::sregex::compile("\n|\r"), std::string("_"));
+    stream << name << " [label=\"" << node.name << " - " << label << "\"];" << std::endl;
+
     std::vector<std::string> names;
-    for (std::vector<Node *>::const_iterator iter = node->children.begin(); iter != node->children.end(); ++iter)
+    for (auto iter = node.children.cbegin(); iter != node.children.cend(); ++iter)
         names.push_back((*iter)->debug(stream));
     for (auto iter = names.begin(); iter != names.end(); ++iter)
         stream << name << " -> " << (*iter) << ";" << std::endl;
@@ -93,6 +115,7 @@ static void literal(Match &match, Node &node)
 {
     int token = match.begin.token;
     node.text = parser::to_string(match.begin, match.end);
+    node.type = Node::VALUE;
     switch (token) {
     case lexer::IDENTIFIER:
         node.value = node.text;
@@ -112,6 +135,7 @@ static void literal(Match &match, Node &node)
         s = boost::xpressive::regex_replace(s, boost::xpressive::sregex::compile("(?<!\\\\)\\\\n"), std::string("\n"));
         s = boost::xpressive::regex_replace(s, boost::xpressive::sregex::compile("(?<!\\\\)\\\\r"), std::string("\r"));
         node.value = s;
+        node.children.clear();
         break;
     }
 
@@ -120,6 +144,22 @@ static void literal(Match &match, Node &node)
         ::exit(1);
         break;
     }
+    assert(!node.children.size());
+}
+
+static void skip_node(Node &node)
+{
+    // Insert node's children into parent.
+    Node::child_iterator_type iter;
+    for (iter = node.parent->children.begin(); iter != node.parent->children.end(); ++iter)
+        if (iter->get() == &node)
+            break;
+    // If this node was already skipped, and we're trying to skip it again,
+    // just ignore.
+    if (iter == node.parent->children.end())
+        return;
+    node.parent->children.insert(iter, node.children.begin(), node.children.end());
+    node.parent->children.erase(iter);
 }
 
 }
