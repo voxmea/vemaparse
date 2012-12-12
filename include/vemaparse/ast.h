@@ -17,6 +17,7 @@ namespace ast
 {
 
 struct Scope;
+struct Node;
 
 typedef boost::variant<uint64_t, double, Scope *, std::string> Value;
 
