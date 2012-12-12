@@ -64,25 +64,6 @@ struct RuleResult
         // Expected that this will be filled in later by the rule.
         match.begin = e_;
     }
-
-    RuleResult(Iterator b_, Iterator e_, const Rule<Iterator> &r_, std::function<void(Match<Iterator> &, ast::Node &)> a_)
-        : matched(true)
-    {
-        match.begin = b_;
-        match.end = e_;
-        match.rule = r_;
-        match.action = a_;
-    }
-
-    RuleResult(bool m_, Iterator b_, Iterator e_, const Rule<Iterator> &r_, std::function<void(Match<Iterator> &, ast::Node &)> a_)
-        : matched(m_)
-    {
-        match.begin = b_;
-        match.end = e_;
-        match.rule = r_;
-        match.action = a_;
-    }
-
 };
 
 template <typename Iterator>

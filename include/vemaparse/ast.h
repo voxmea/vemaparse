@@ -46,7 +46,7 @@ static std::string default_debug(std::ostream &stream, const Node *node)
 
     if (!node->text.empty()) {
         std::string text = boost::xpressive::regex_replace(node->text, boost::xpressive::sregex::compile("(?<!\\\\)\""), std::string("\\\""));
-        stream << name << " [label=\"" << text << "\"];" << std::endl;
+        stream << name << " [label=\"" << name << " - " << text << "\"];" << std::endl;
     }
 
     std::vector<std::string> names;
