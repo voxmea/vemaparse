@@ -82,6 +82,7 @@ static std::string default_debug(std::ostream &stream, const Node &node)
 
 static void skip_node(Node &node)
 {
+    std::cerr << "skip_node" << std::endl;
     // Insert node's children into parent.
     Node::child_iterator_type iter;
     for (iter = node.parent->children.begin(); iter != node.parent->children.end(); ++iter)
