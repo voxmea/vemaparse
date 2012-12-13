@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <list>
+#include <deque>
 #include <string>
 #include <functional>
 #include <memory>
@@ -79,6 +80,21 @@ static std::string default_debug(std::ostream &stream, const Node &node)
     return name;
 }
 
+static void skip_node(Node &node)
+{
+    // Insert node's children into parent.
+    Node::child_iterator_type iter;
+    for (iter = node.parent->children.begin(); iter != node.parent->children.end(); ++iter)
+        if (iter->get() == &node)
+            break;
+    // If this node was already skipped, and we're trying to skip it again,
+    // just ignore.
+    if (iter == node.parent->children.end())
+        return;
+    node.parent->children.insert(iter, node.children.begin(), node.children.end());
+    node.parent->children.erase(iter);
+}
+
 static bool to_number(const std::string &text, Value &value)
 {
     if (text.empty())
@@ -147,20 +163,25 @@ static void literal(Match &match, Node &node)
     assert(!node.children.size());
 }
 
-static void skip_node(Node &node)
+static void variable_declaration(Node &node)
 {
-    // Insert node's children into parent.
-    Node::child_iterator_type iter;
-    for (iter = node.parent->children.begin(); iter != node.parent->children.end(); ++iter)
-        if (iter->get() == &node)
-            break;
-    // If this node was already skipped, and we're trying to skip it again,
-    // just ignore.
-    if (iter == node.parent->children.end())
-        return;
-    node.parent->children.insert(iter, node.children.begin(), node.children.end());
-    node.parent->children.erase(iter);
+    node.name = "variable_declaration";
 }
+
+static void binary_operator(Node &node)
+{
+    assert(node.children.size() == 2);
+    // Pull up the op and the right expression
+    Node::child_iterator_type iter = node.children.begin();
+    ++iter;
+    skip_node(**iter);
+    iter = node.children.begin();
+    ++iter;
+    node.name = (*iter)->text;
+    node.children.erase(iter);
+    std::cout << "What?\n";
+}
+
 
 }
 

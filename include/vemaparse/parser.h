@@ -109,6 +109,8 @@ struct Rule
             if (!ret.matched)
                 ret.match.end = token_pos;
         }
+        if (ret.match.rule.name == "multiplicative_expression")
+            std::cout << "it's here\n";
         return ret;
     }
 
@@ -170,6 +172,8 @@ void propagate_child_info(RuleResult<Iterator> &ret, const RuleResult<Iterator> 
 {
     ret.matched = child.matched;
     ret.match.end = child.match.end;
+    if (child.match.rule.name == "multiplicative_expression")
+        std::cout << "found it\n";
     ret.match.children.push_back(std::make_shared<Match<Iterator>>(child.match));
 }
 
@@ -187,7 +191,7 @@ Rule<Iterator> &operator >>(Rule<Iterator> &first, Rule<Iterator> &second)
             tmp = rule.right->match(ret.match.end, eos);
             propagate_child_info(ret, tmp);
             if (!tmp.matched) {
-                ret.match.end = token_pos;
+                    ret.match.end = token_pos;
             }
         }
         return ret;
