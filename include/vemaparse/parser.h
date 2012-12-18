@@ -23,7 +23,7 @@
 
 namespace ast
 {
-    struct Node;
+    template <typename> struct Node;
 }
 
 namespace parser
@@ -44,7 +44,7 @@ struct Match
 {
     typedef std::shared_ptr<Match> match_ptr;
     Iterator begin, end;
-    std::function<void(Match &, ast::Node &)> action;
+    std::function<void(Match &, ast::Node<Iterator> &)> action;
     Rule<Iterator> rule;
     std::deque<match_ptr> children;
 };
@@ -71,7 +71,7 @@ struct Rule
 {
     typedef Match<Iterator> match_type;
     typedef RuleResult<Iterator> rule_result;
-    typedef void action_type(match_type &, ast::Node &);
+    typedef void action_type(match_type &, ast::Node<Iterator> &);
 
     Rule() : name("UNKNOWN"), must_consume_token(true), left(nullptr), right(nullptr) { }
     Rule(const std::string &name_) : name(name_), must_consume_token(true), left(nullptr), right(nullptr) { }
@@ -89,6 +89,7 @@ struct Rule
     //  2. Even on fail, append any children that matched for debugging.
     rule_result match(Iterator token_pos, Iterator eos) const
     {
+        static int depth = 0;
         if (must_consume_token && token_pos == eos)
             return rule_result(false, eos);
         rule_result ret;
@@ -293,6 +294,13 @@ Rule<Iterator> &operator -(Rule<Iterator> &first)
         return ret;
     };
     return rule;
+}
+
+// 1 or more
+template <typename Iterator>
+Rule<Iterator> &operator +(Rule<Iterator> &first)
+{
+    return (first >> (*first));
 }
 
 } // namespace parser

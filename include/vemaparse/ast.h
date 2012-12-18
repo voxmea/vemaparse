@@ -13,6 +13,16 @@
 #include <boost/xpressive/xpressive.hpp>
 #include <boost/variant.hpp>
 
+#ifdef _MSC_VER
+#pragma warning(push, 1)
+#pragma warning(disable:4702)
+#endif
+#include <boost/xpressive/xpressive.hpp>
+#ifdef _MSC_VER
+#pragma warning(default:4996)
+#pragma warning(pop)
+#endif
+
 #include "lexer.h"
 #include "parser.h"
 
@@ -20,12 +30,14 @@ namespace ast
 {
 
 struct Scope;
-struct Node;
+template <typename> struct Node;
 
 typedef boost::variant<uint64_t, double, Scope *, std::string> Value;
 
-static std::string default_debug(std::ostream &stream, const Node &node);
+template <typename Iterator>
+std::string default_debug(std::ostream &stream, const Node<Iterator> &node);
 
+template <typename Iterator>
 struct Node
 {
     typedef std::shared_ptr<Node> node_ptr;
@@ -38,29 +50,42 @@ struct Node
         NUM_TYPES,
         INVALID = NUM_TYPES
     };
+    Type type;
+    Iterator begin, end;
     std::string text;
     std::string name;
     Value value;
     std::function<std::string(std::ostream &)> debug;
     node_ptr parent;
-    typedef std::list<node_ptr>::iterator child_iterator_type;
-    typedef std::list<node_ptr>::const_iterator const_child_iterator_type;
-    std::list<node_ptr> children;
-    Type type;
 
-    Node() : type(INVALID) {debug = [this](std::ostream &s) {return default_debug(s, *this);};}
+    typedef typename std::list<node_ptr>::iterator child_iterator_type;
+    typedef typename std::list<node_ptr>::const_iterator const_child_iterator_type;
+    std::list<node_ptr> children;
+
+    Node() : type(INVALID)
+    {
+        debug = [this](std::ostream &s) {return default_debug(s, *this);};
+    }
+
+    Node(const Iterator b_, const Iterator e_) 
+        : type(INVALID), begin(b_), end(e_) 
+    {
+        debug = [this](std::ostream &s) {return default_debug(s, *this);};
+    }
 };
 
-inline std::string to_string(Node::const_child_iterator_type begin, Node::const_child_iterator_type end)
+template <typename Iterator>
+std::string to_string(typename Node<Iterator>::const_child_iterator_type begin, typename Node<Iterator>::const_child_iterator_type end)
 {
     std::string ret;
-    std::for_each(begin, end, [&ret](Node::node_ptr n) {ret += n->text;});
+    std::for_each(begin, end, [&ret](typename Node<Iterator>::node_ptr n) {ret += n->text;});
     return ret;
 }
 
 namespace detail
 {
-    inline void print_children(Node &node)
+    template <typename Iterator>
+    void print_children(Node<Iterator> &node)
     {
         std::cerr << node.name << " children : ";
         for (auto i = node.children.begin(); i != node.children.end(); ++i)
@@ -69,7 +94,8 @@ namespace detail
     }
 }
 
-static std::string default_debug(std::ostream &stream, const Node &node)
+template <typename Iterator>
+std::string default_debug(std::ostream &stream, const Node<Iterator> &node)
 {
     static uint64_t counter = 0;
     std::string name = boost::xpressive::regex_replace(node.name, boost::xpressive::sregex::compile(" |-|>|\n|\r|\\\\|\\(|\\)"), std::string("_"));
@@ -80,12 +106,12 @@ static std::string default_debug(std::ostream &stream, const Node &node)
     }
 
     std::string label;
-    if (node.type == Node::VALUE) {
+    if (node.type == Node<Iterator>::VALUE) {
         std::ostringstream ss;
         ss << node.value;
         label = ss.str();
     } else if (!node.text.empty()) {
-        label = ast::to_string(node.children.begin(), node.children.end());
+        label = ast::to_string<Iterator>(node.children.begin(), node.children.end());
     }
     label = boost::xpressive::regex_replace(label, boost::xpressive::sregex::compile("(?<!\\\\)\""), std::string("\\\""));
     label = boost::xpressive::regex_replace(label, boost::xpressive::sregex::compile("\n|\r"), std::string("_"));
@@ -99,10 +125,11 @@ static std::string default_debug(std::ostream &stream, const Node &node)
     return name;
 }
 
-static void skip_node(Node &node)
+template <typename Iterator>
+void skip_node(Node<Iterator> &node)
 {
     // Insert node's children into parent.
-    Node::child_iterator_type iter;
+    typename Node<Iterator>::child_iterator_type iter;
     for (iter = node.parent->children.begin(); iter != node.parent->children.end(); ++iter)
         if (iter->get() == &node)
             break;
@@ -127,10 +154,11 @@ static void skip_node(Node &node)
     #endif
 }
 
-static void use_middle(Node &node)
+template <typename Iterator>
+void use_middle(Node<Iterator> &node)
 {
     assert(node.children.size() == 3);
-    Node::child_iterator_type iter;
+    typename Node<Iterator>::child_iterator_type iter;
     // Insert node's right children into parent.
     for (iter = node.parent->children.begin(); iter != node.parent->children.end(); ++iter)
         if (iter->get() == &node)
@@ -143,24 +171,43 @@ static void use_middle(Node &node)
     skip_node(node);
 }
 
-static void skip_left(Node &node)
+template <typename Iterator>
+void remove_terminals(Node<Iterator> &node)
 {
-    assert(node.children.size() >= 1);
-    Node::child_iterator_type iter;
+    typename Node<Iterator>::child_iterator_type iter;
     // Insert node's right children into parent.
     for (iter = node.parent->children.begin(); iter != node.parent->children.end(); ++iter)
         if (iter->get() == &node)
             break;
     assert(iter != node.parent->children.end());
-    for (auto i = node.children.begin(); i != node.children.end(); ++i)
-        std::cerr << "child " << (*i)->text << std::endl;
-    std::cerr << "Erasing " << ((*node.children.begin())->text) << std::endl;
-    node.children.erase(node.children.begin());
-    node.parent->children.insert(iter, node.children.begin(), node.children.end());
-    node.parent->children.erase(iter);
+    iter = node.children.begin();
+    while (iter != node.children.end()) {
+        if ((*iter)->children.size() == 0) {
+            node.children.erase(iter++);
+        } else {
+            ++iter;
+        }
+    }
 }
 
-static bool to_number(const std::string &text, Value &value)
+template <typename Iterator>
+void remove_terminals_match(Node<Iterator> &node, std::string regex_string)
+{
+    boost::xpressive::sregex regex = boost::xpressive::sregex::compile(regex_string);
+    typename Node<Iterator>::child_iterator_type iter;
+    iter = node.children.begin();
+    while (iter != node.children.end()) {
+        boost::xpressive::smatch what;
+        bool matched = boost::xpressive::regex_match((*iter)->text, what, regex);
+        if (matched) {
+            node.children.erase(iter++);
+        } else {
+            ++iter;
+        }
+    }
+}
+
+inline bool to_number(const std::string &text, Value &value)
 {
     if (text.empty())
         return 0;
@@ -191,12 +238,12 @@ static bool to_number(const std::string &text, Value &value)
     return true;
 }
 
-template <typename Match>
-static void literal(Match &match, Node &node)
+template <typename Match, typename Iterator>
+static void literal(Match &match, Node<Iterator> &node)
 {
     int token = match.begin.token;
     node.text = parser::to_string(match.begin, match.end);
-    node.type = Node::VALUE;
+    node.type = Node<Iterator>::VALUE;
     switch (token) {
     case lexer::IDENTIFIER:
         node.value = node.text;
@@ -228,16 +275,18 @@ static void literal(Match &match, Node &node)
     assert(!node.children.size());
 }
 
-static void variable_declaration(Node &node)
+template <typename Iterator>
+void variable_declaration(Node<Iterator> &node)
 {
     node.name = "variable_declaration";
-    Node::child_iterator_type iter = node.children.begin();
+    typename Node<Iterator>::child_iterator_type iter = node.children.begin();
     assert((*iter)->children.size() == 0);
     node.children.erase(iter++);
+    // Skip the ID
+    ++iter;
     if (iter != node.children.end()) {
         // initializer
         assert(node.children.size() == 3);
-        ++iter;
         // Get rid of equals
         node.children.erase(iter++);
     }
@@ -288,7 +337,8 @@ static std::string op_to_name(std::string op)
     return "I DONT KNOW " + op;
 }
 
-static void unary_operator(Node &node)
+template <typename Iterator>
+void unary_operator(Node<Iterator> &node)
 {
     // Pass through
     if (node.children.size() <= 1) {
@@ -296,12 +346,13 @@ static void unary_operator(Node &node)
         return;
     }
 
-    Node::child_iterator_type iter = node.children.begin();
+    typename Node<Iterator>::child_iterator_type iter = node.children.begin();
     node.name = op_to_name((*iter)->text);
     node.children.erase(iter);
 }
 
-static void binary_operator(Node &node)
+template <typename Iterator>
+void binary_operator(Node<Iterator> &node)
 {
     // Pass through
     if (node.children.size() <= 1) {
@@ -311,16 +362,23 @@ static void binary_operator(Node &node)
 
     assert(node.children.size() > 2);
 
-    Node::child_iterator_type iter = node.children.begin();
+    typename Node<Iterator>::child_iterator_type iter = node.children.begin();
     ++iter;
     node.name = op_to_name((*iter)->text);
     while (iter != node.children.end()) {
         assert((*iter)->children.size() == 0);
-        Node::child_iterator_type to_delete = iter++;
+        typename Node<Iterator>::child_iterator_type to_delete = iter++;
         node.children.erase(to_delete);
         assert(iter != node.children.end());
         ++iter;
     }
+}
+
+template <typename Iterator>
+void string_expression(Node<Iterator> &node)
+{
+    node.name = "string expression";
+    remove_terminals_match(node, ",");
 }
 
 
