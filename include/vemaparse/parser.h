@@ -23,6 +23,9 @@
 
 namespace ast
 {
+    /**
+     * Required: client code must define a type named Node in the ast namespace.
+     */
     template <typename> struct Node;
 }
 

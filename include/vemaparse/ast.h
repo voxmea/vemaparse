@@ -26,10 +26,6 @@
 #include "lexer.h"
 #include "parser.h"
 
-/**
- * Requirement: client code must define a type named Node in the ast namespace.
- */
-
 namespace ast
 {
 
