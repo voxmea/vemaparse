@@ -208,17 +208,17 @@ static void literal(Match &match, Node &node)
     switch (token) {
     case lexer::IDENTIFIER:
         node.value = node.text;
-        node.name = "IDENTIFIER";
+        node.name = "identifier";
         break;
 
     case lexer::NUMBER_LITERAL:
-        node.name = "NUMBER";
+        node.name = "number";
         ::ast::to_number(node.text, node.value);
         break;
 
     case lexer::STRING_LITERAL:
     {
-        node.name = "STRING";
+        node.name = "string";
         std::string s = boost::xpressive::regex_replace(node.text, boost::xpressive::sregex::compile("(?<!\\\\)\""), std::string());
         s = boost::xpressive::regex_replace(s, boost::xpressive::sregex::compile("(?<!\\\\)\\\\\""), std::string("\""));
         s = boost::xpressive::regex_replace(s, boost::xpressive::sregex::compile("(?<!\\\\)\\\\n"), std::string("\n"));
