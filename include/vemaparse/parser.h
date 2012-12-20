@@ -1,6 +1,6 @@
 
-#ifndef MEL_PARSER_H_
-#define MEL_PARSER_H_
+#ifndef VEMAPARSE_PARSER_H_
+#define VEMAPARSE_PARSER_H_
 
 #include <tuple>
 #include <functional>

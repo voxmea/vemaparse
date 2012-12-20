@@ -1,6 +1,6 @@
 
-#ifndef MEL_LEXER_H_
-#define MEL_LEXER_H_
+#ifndef VEMAPARSE_LEXER_H_
+#define VEMAPARSE_LEXER_H_
 
 #include <locale>
 #include <cassert>
