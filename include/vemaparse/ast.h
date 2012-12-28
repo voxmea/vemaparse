@@ -29,9 +29,6 @@
 namespace ast
 {
 
-struct Scope;
-typedef boost::variant<uint64_t, double, Scope *, std::string> Value;
-
 template <typename Node>
 std::string default_debug(std::ostream &stream, const Node &node);
 
@@ -39,7 +36,7 @@ template <typename Node>
 std::string to_string(typename Node::const_child_iterator_type begin, typename Node::const_child_iterator_type end)
 {
     std::string ret;
-    std::for_each(begin, end, [&ret](Node::node_ptr n) {ret += n->text;});
+    std::for_each(begin, end, [&ret](typename Node::node_ptr n) {ret += n->text;});
     return ret;
 }
 
@@ -50,7 +47,7 @@ namespace detail
     {
         std::cerr << node.name << " children : ";
         for (auto i = node.children.begin(); i != node.children.end(); ++i)
-            std::cerr << " " << (*i)->text;
+            std::cerr << " /-\\ " << (*i)->text;
         std::cerr << "\n";
     }
 }
@@ -120,7 +117,6 @@ void use_middle(Node &node)
 {
     assert(node.children.size() == 3);
     typename Node::child_iterator_type iter;
-    // Insert node's right children into parent.
     for (iter = node.parent->children.begin(); iter != node.parent->children.end(); ++iter)
         if (iter->get() == &node)
             break;
@@ -136,11 +132,6 @@ template <typename Node>
 void remove_terminals(Node &node)
 {
     typename Node::child_iterator_type iter;
-    // Insert node's right children into parent.
-    for (iter = node.parent->children.begin(); iter != node.parent->children.end(); ++iter)
-        if (iter->get() == &node)
-            break;
-    assert(iter != node.parent->children.end());
     iter = node.children.begin();
     while (iter != node.children.end()) {
         if ((*iter)->children.size() == 0) {
@@ -168,7 +159,8 @@ void remove_terminals_match(Node &node, std::string regex_string)
     }
 }
 
-inline bool to_number(const std::string &text, Value &value)
+template <typename T>
+inline bool to_number(const std::string &text, T &value)
 {
     if (text.empty())
         return 0;

@@ -108,8 +108,8 @@ private:
 
     LexerIterator<Iterator> next(const Iterator &start) const
     {
-        static const char specials_[] = "{}()[]#";
-        static const auto is_special = [](const char c) { 
+        const char specials_[] = "{}()[]#";
+        const auto is_special = [specials_](const char c) { 
             for (const char *s = specials_; *s; ++s)
                 if (c == *s) 
                     return true;
@@ -153,12 +153,15 @@ private:
 
         // quoted strings
         if (*cur == '"') {
-            char last_char = *cur;
+            bool open_slash = false;
             Iterator begin_pos = cur++;
             while (cur != end_pos) {
-                if (*cur == '"' && last_char != '\\')
+                if (*cur == '"' && !open_slash)
                     break;
-                last_char = *cur;
+                if (*cur == '\\')
+                    open_slash = !open_slash;
+                else
+                    open_slash = false;
                 ++cur;
             }
             if (cur == end_pos) 
