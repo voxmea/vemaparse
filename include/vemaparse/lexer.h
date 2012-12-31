@@ -50,6 +50,7 @@ struct LexerError : public std::exception
 template <typename Iterator>
 struct LexerIterator : public std::iterator<std::forward_iterator_tag, Iterator>
 {
+    typedef typename Iterator::difference_type difference_type;
     const Lexer<Iterator> *lexer;
     Iterator begin, end;
     Token token;
@@ -87,6 +88,11 @@ struct LexerIterator : public std::iterator<std::forward_iterator_tag, Iterator>
     bool operator!=(const LexerIterator &other)
     {
         return !(*this == other);
+    }
+
+    difference_type operator -(const LexerIterator &other)
+    {
+        return end - other.end;
     }
 };
 

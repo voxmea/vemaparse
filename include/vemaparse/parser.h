@@ -61,13 +61,21 @@ struct RuleResult
     RuleResult() : matched(false) { }
 
     RuleResult(bool m_, Iterator e_)
-        : matched(m_) 
+        : matched(m_)
     {
         match.end = e_;
         // Expected that this will be filled in later by the rule.
         match.begin = e_;
     }
 };
+
+template <typename Iterator>
+Match<Iterator> right_most(Match<Iterator> &m)
+{
+    if (m.children.empty())
+        return m;
+    return right_most(*m.children.back().get());
+}
 
 template <typename Iterator>
 struct Rule
@@ -208,16 +216,28 @@ Rule<Iterator> &operator |(Rule<Iterator> &first, Rule<Iterator> &second)
     rule.must_consume_token = first.must_consume_token || second.must_consume_token;
     rule.match_ = [&rule](Iterator token_pos, Iterator eos) -> typename Rule<Iterator>::rule_result 
     { 
-        typename Rule<Iterator>::rule_result ret, tmp;
-        tmp = rule.left->match(token_pos, eos);
+        typename Rule<Iterator>::rule_result ret, tmpl, tmpr;
+        tmpl = rule.left->match(token_pos, eos);
         // TODO: if both fail should we propagate all the child info? 
         // Just the failure with the most children?
-        if (tmp.matched) {
-            propagate_child_info(ret, tmp);
+        if (tmpl.matched) {
+            propagate_child_info(ret, tmpl);
             return ret;
         }
-        tmp = rule.right->match(token_pos, eos);
-        propagate_child_info(ret, tmp);
+        tmpr = rule.right->match(token_pos, eos);
+        if (tmpr.matched) {
+            propagate_child_info(ret, tmpr);
+            return ret;
+        }
+
+        // Didn't match, see which match got further
+        typename Iterator::difference_type ld = right_most(tmpl.match).end - token_pos;
+        typename Iterator::difference_type lr = right_most(tmpr.match).end - token_pos;
+        if (ld < lr) {
+            propagate_child_info(ret, tmpr);
+        } else {
+            propagate_child_info(ret, tmpl);
+        }
         return ret;
     };
     return rule;
