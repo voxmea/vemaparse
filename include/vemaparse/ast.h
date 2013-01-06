@@ -5,6 +5,8 @@
 #include <iostream>
 #include <list>
 #include <deque>
+#include <tuple>
+#include <vector>
 #include <string>
 #include <functional>
 #include <memory>
@@ -42,6 +44,14 @@ std::string to_string(typename Node::const_child_iterator_type begin, typename N
 
 namespace detail
 {
+    template <typename Iterator>
+    void print_children(const std::string &name, Iterator begin, Iterator end)
+    {
+        std::cerr << name << " children : ";
+        for (auto i = begin; i != end; ++i)
+            std::cerr << " /-\\ " << (**i)->text;
+        std::cerr << "\n";
+    }
     template <typename Node>
     void print_children(Node &node)
     {
@@ -143,20 +153,43 @@ void remove_terminals(Node &node)
 }
 
 template <typename Node>
-void remove_terminals_match(Node &node, std::string regex_string)
+void remove_terminals_match(Node &node, const std::string &regex_string)
 {
     boost::xpressive::sregex regex = boost::xpressive::sregex::compile(regex_string);
     typename Node::child_iterator_type iter;
     iter = node.children.begin();
     while (iter != node.children.end()) {
         boost::xpressive::smatch what;
-        bool matched = boost::xpressive::regex_match((*iter)->text, what, regex);
+        const bool matched = boost::xpressive::regex_match((*iter)->text, what, regex);
         if (matched) {
             node.children.erase(iter++);
         } else {
             ++iter;
         }
     }
+}
+
+template <typename Node>
+std::tuple<std::vector<typename Node::child_iterator_type>, std::vector<typename Node::child_iterator_type>>
+split_match(Node &node, const std::string &regex_string)
+{
+    boost::xpressive::sregex regex = boost::xpressive::sregex::compile(regex_string);
+    std::vector<typename Node::child_iterator_type> l, r;
+    auto iter = node.children.begin();
+    while (iter != node.children.end()) {
+        boost::xpressive::smatch what;
+        const bool matched = boost::xpressive::regex_match((*iter)->text, what, regex);
+        if (matched) {
+            ++iter;
+            break;
+        }
+        l.push_back(iter);
+        ++iter;
+    }
+    // Collect everything after the match
+    for (; iter != node.children.end(); ++iter)
+        r.push_back(iter);
+    return std::make_tuple(l, r);
 }
 
 template <typename T>
