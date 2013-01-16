@@ -94,6 +94,17 @@ std::string default_debug(std::ostream &stream, const Node &node)
 }
 
 template <typename Node>
+void remove_node(Node &node)
+{
+    typename Node::child_iterator_type iter;
+    for (iter = node.parent->children.begin(); iter != node.parent->children.end(); ++iter)
+        if (iter->get() == &node)
+            break;
+    assert(iter != node.parent->children.end());
+    node.parent->children.erase(iter);
+}
+
+template <typename Node>
 void skip_node(Node &node)
 {
     // Insert node's children into parent.
