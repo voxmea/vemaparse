@@ -115,7 +115,7 @@ private:
     LexerIterator<Iterator> next(const Iterator &start) const
     {
         const char specials_[] = "{}()[]#";
-        const auto is_special = [&specials_](const char c) { 
+        const auto is_special = [&specials_](const char c) -> bool { 
             for (const char *s = specials_; *s; ++s)
                 if (c == *s) 
                     return true;
