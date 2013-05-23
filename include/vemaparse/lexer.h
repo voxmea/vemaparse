@@ -41,6 +41,7 @@ struct LexerError : public std::exception
 {
     std::string message;
     LexerError(const std::string &error) : message(error) { }
+    ~LexerError() NOEXCEPT { }
     const char *what() const NOEXCEPT
     {
         return message.c_str();
@@ -69,10 +70,10 @@ struct LexerIterator : public std::iterator<std::forward_iterator_tag, Iterator>
         }
         assert(begin != end);
         Iterator tmp = begin;
-        std::string val;
+        std::vector<char> buf;
         while (tmp != end)
-            val += *tmp++;
-        return val;
+            buf.push_back(*tmp++);
+        return std::string(buf.begin(), buf.end());
     }
 
     bool operator==(const LexerIterator &other)
