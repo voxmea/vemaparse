@@ -57,7 +57,7 @@ struct LexerIterator : public std::iterator<std::forward_iterator_tag, Iterator>
     Token token;
     bool is_end;
     LexerIterator() : lexer(NULL), token(INVALID), is_end(true) { }
-    LexerIterator(const Lexer<Iterator> *lexer_, Token token_, Iterator begin_, Iterator end_) : lexer(lexer_), token(token_), begin(begin_), end(end_), is_end(false) { }
+    LexerIterator(const Lexer<Iterator> *lexer_, Token token_, Iterator begin_, Iterator end_) : lexer(lexer_), begin(begin_), end(end_), token(token_), is_end(false) { }
     LexerIterator(const Lexer<Iterator> *lexer_, Iterator end_) : lexer(lexer_), begin(end_), end(end_), token(INVALID), is_end(true) { }
 
     LexerIterator &operator ++();
@@ -179,7 +179,7 @@ private:
         // identifiers
         if (std::isalpha(*cur, locale) || (*cur == '_')) {
             Iterator begin_pos = cur++;
-            while (cur != end_pos && (std::isalnum(*cur, locale) || (*cur == '_') || (*cur == '.')))
+            while (cur != end_pos && (std::isalnum(*cur, locale) || (*cur == '_')))
                 ++cur;
             return LexerIterator<Iterator>(this, IDENTIFIER, begin_pos, cur);
         }
@@ -200,16 +200,7 @@ private:
             return LexerIterator<Iterator>(this, OPERATOR, begin_pos, cur);
         }
 
-        Iterator begin_pos = cur++;
         throw LexerError("unknown input type");
-#if 0
-        xp::sregex id = xp::sregex::compile("(?P<identifier>([a-z]|[A-Z]|'_')([a-z]|[A-Z]|[0-9]|'_')*)");
-        xp::sregex op = xp::sregex::compile("(?P<operator>([^a-zA-Z0-9_\\s])+)");
-        xp::sregex qs = xp::sregex::compile("(?P<quotedstring>\".*?[^\\\\]\")");
-        xp::sregex ws = xp::sregex::compile("(?P<whitespace>\\s+)");
-        xp::sregex dec = xp::sregex::compile("(?P<decimal>[1-9][0-9]*(?![^a-zA-Z]))");
-        xp::sregex hex = xp::sregex::compile("(?P<hex>0x[0-9a-fA-F]+)");
-#endif
     }
 
 public:
