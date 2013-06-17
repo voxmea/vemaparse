@@ -218,15 +218,15 @@ inline bool to_number(const std::string &text, T &value)
             ss.str(text.substr(2, text.size()));
             uint64_t tmp;
             ss >> std::hex >> tmp;
-            value = tmp;
+            value = T(tmp);
         } else if (text.find(".") != std::string::npos) {
             double tmp;
             ss >> tmp;
-            value = tmp;
+            value = T(tmp);
         } else {
             uint64_t tmp;
             ss >> std::dec >> tmp;
-            value = tmp;
+            value = T(tmp);
         }
     }
     char c;
@@ -243,7 +243,7 @@ static void literal(Match &match, Node &node)
     node.type = Node::VALUE;
     switch (token) {
     case lexer::IDENTIFIER:
-        node.value = node.text;
+        node.value = decltype(node.value)(node.text);
         node.name = "identifier";
         break;
 
@@ -259,7 +259,7 @@ static void literal(Match &match, Node &node)
         s = boost::xpressive::regex_replace(s, boost::xpressive::sregex::compile("(?<!\\\\)\\\\\""), std::string("\""));
         s = boost::xpressive::regex_replace(s, boost::xpressive::sregex::compile("(?<!\\\\)\\\\n"), std::string("\n"));
         s = boost::xpressive::regex_replace(s, boost::xpressive::sregex::compile("(?<!\\\\)\\\\r"), std::string("\r"));
-        node.value = s;
+        node.value = decltype(node.value)(s);
         node.children.clear();
         break;
     }
