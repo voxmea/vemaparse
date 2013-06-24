@@ -100,7 +100,6 @@ struct Rule
     //  2. Even on fail, append any children that matched for debugging.
     rule_result match(Iterator token_pos, Iterator eos) const
     {
-        static int depth = 0;
         if (must_consume_token && token_pos == eos)
             return rule_result(false, eos);
         rule_result ret;
