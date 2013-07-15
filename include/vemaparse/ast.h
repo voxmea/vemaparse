@@ -272,7 +272,7 @@ static void literal(Match &match, Node &node)
     assert(!node.children.size());
 }
 
-static std::string op_to_name(std::string op)
+inline std::string op_to_name(std::string op)
 {
     if (op == "+")
         return "plus";
