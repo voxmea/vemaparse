@@ -104,7 +104,10 @@ struct Rule
             return rule_result(false, eos);
         rule_result ret;
         try {
+            // static int depth = 0;
+            // std::cout << depth++ << ":trying " << name << " on \"" << *token_pos << "\"" << std::endl;
             ret = match_(token_pos, eos);
+            // depth--;
         } catch (const lexer::LexerError &ex) {
             std::cerr << "ERROR: " << ex.what() << std::endl;
             ret.matched = false;
@@ -285,8 +288,9 @@ Rule<Iterator> &operator /(Rule<Iterator> &first, Rule<Iterator> &second)
             }
             tmp = rule.left->match(start_pos, eos);
             propagate_child_info(ret, tmp);
-            if (!tmp.matched) {
-                ret.match.end = token_pos;
+            // Sometimes optional or star can return true, but didn't consume
+            // anything. That means we'll loop forever.
+            if (!tmp.matched || (tmp.match.end == start_pos)) {
                 break;
             }
         }
