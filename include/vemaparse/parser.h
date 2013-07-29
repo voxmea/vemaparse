@@ -48,7 +48,7 @@ struct Match
     typedef std::shared_ptr<Match> match_ptr;
     Iterator begin, end;
     std::function<void(Match &, ast::Node<Iterator> &)> action;
-    Rule<Iterator> rule;
+    const Rule<Iterator> *rule;
     std::deque<match_ptr> children;
 };
 
@@ -116,7 +116,7 @@ struct Rule
         }
         assert(ret.matched || ret.match.end == token_pos);
         ret.match.begin = token_pos;
-        ret.match.rule = *this;
+        ret.match.rule = this;
         ret.match.action = action;
         if (check) {
             ret.matched = check(ret.match);
