@@ -21,123 +21,75 @@
 #pragma warning(pop)
 #endif
 
-namespace ast
+namespace vemaparse
 {
-    /**
-     * Required: client code must define a type named Node in the ast namespace.
-     */
-    template <typename> struct Node;
-}
 
-namespace parser
+template <typename Iterator, typename ActionType>
+struct Match : std::enable_shared_from_this<Match<Iterator, ActionType>>
 {
-template<typename T>
-inline std::string to_string(T begin, T end)
+    bool matched;
+    std::string name;
+    Iterator begin, end;
+    std::function<void(ActionType &)> action;
+    std::deque<std::shared_ptr<Match>> children;
+
+    Match(Iterator end_) : matched(false), end(end_) { }
+    Match(bool matched_, Iterator end_) : matched(matched_), end(end_) { }
+
+    std::shared_ptr<Match> get_shared_ptr() {return this->shared_from_this();}
+};
+
+template <typename Iterator, typename ActionType>
+std::string to_string(const Match<Iterator, ActionType> &m)
 {
     std::string ret;
-    std::for_each(begin, end, [&ret](const std::string &s) {ret += s;});
+    std::for_each(m.begin, m.end, [&ret](const std::string &s) {ret += s;});
     return ret;
 }
 
-template <typename Iterator> struct Rule;
-template <typename Iterator> struct RuleResult;
+template <typename Iterator, typename ActionType> class RuleResult;
 
-template <typename Iterator>
-struct Match
+template <typename Iterator, typename ActionType>
+struct Rule : std::enable_shared_from_this<Rule<Iterator, ActionType>>
 {
-    typedef std::shared_ptr<Match> match_ptr;
-    Iterator begin, end;
-    std::function<void(Match &, ast::Node<Iterator> &)> action;
-    const Rule<Iterator> *rule;
-    std::deque<match_ptr> children;
-};
-
-template <typename Iterator>
-struct RuleResult
-{
-    bool matched;
-    Match<Iterator> match;
-
-    RuleResult() : matched(false) { }
-
-    RuleResult(bool m_, Iterator e_)
-        : matched(m_)
-    {
-        match.end = e_;
-        // Expected that this will be filled in later by the rule.
-        match.begin = e_;
-    }
-};
-
-template <typename Iterator>
-Match<Iterator> right_most(Match<Iterator> &m)
-{
-    if (m.children.empty())
-        return m;
-    return right_most(*m.children.back().get());
-}
-
-template <typename Iterator>
-struct Rule
-{
-    typedef Match<Iterator> match_type;
-    typedef RuleResult<Iterator> rule_result;
-    typedef void action_type(match_type &, ast::Node<Iterator> &);
-
-    Rule() : name("UNKNOWN"), must_consume_token(true), left(nullptr), right(nullptr) { }
-    Rule(const std::string &name_) : name(name_), must_consume_token(true), left(nullptr), right(nullptr) { }
-    Rule(const std::string &name_, Rule *l_, Rule *r_ = nullptr) : name(name_), must_consume_token(true), left(l_), right(r_) { }
+    typedef Match<Iterator, ActionType> match_type;
+    typedef std::shared_ptr<match_type> rule_result;
+    typedef void action_type(ActionType &);
+    typedef bool check_type(const match_type &);
 
     std::string name;
-    bool must_consume_token;
-    Rule *left, *right;
     std::function<action_type> action;
-    std::function<bool(match_type &)> check;
-    std::function<rule_result(Iterator, Iterator)> match_;
+    std::function<check_type> check;
+    std::function<rule_result(Iterator, Iterator)> match;
+    bool must_consume_token;
 
-    // Match behavior:
-    //  1. Not matching == returning false. end iterator must be == to begin.
-    //  2. Even on fail, append any children that matched for debugging.
-    rule_result match(Iterator token_pos, Iterator eos) const
+    Rule() { }
+    Rule(const std::string name_) : name(name_) { }
+
+    rule_result get_match(Iterator token_pos, Iterator eos) const
     {
         if (must_consume_token && token_pos == eos)
-            return rule_result(false, eos);
+            return std::make_shared<match_type>(eos);
         rule_result ret;
         try {
             // static int depth = 0;
             // std::cout << depth++ << ":trying " << name << " on \"" << *token_pos << "\"" << std::endl;
-            ret = match_(token_pos, eos);
+            ret = match(token_pos, eos);
             // depth--;
         } catch (const lexer::LexerError &ex) {
             std::cerr << "ERROR: " << ex.what() << std::endl;
-            ret.matched = false;
-            ret.match.end = token_pos;
-            return ret;
+            return std::make_shared<match_type>(false, token_pos);
         }
-        assert(ret.matched || ret.match.end == token_pos);
-        ret.match.begin = token_pos;
-        ret.match.rule = this;
-        ret.match.action = action;
+        assert(ret->matched || ret->end == token_pos);
+        ret->begin = token_pos;
+        ret->name = name;
+        ret->action = action;
         if (check) {
-            ret.matched = check(ret.match);
-            if (!ret.matched)
-                ret.match.end = token_pos;
+            ret->matched = check(*ret);
+            if (!ret->matched)
+                ret->end = token_pos;
         }
         return ret;
-    }
-
-    void debug(const std::string &indent, std::set<const Rule *>visited = std::set<const Rule *>()) const
-    {
-        if (name == "UNKNOWN" || !match_) {
-            std::cerr << "ERROR: recursive rule didn't recurse\n";
-            ::exit(0);
-        }
-        if (left && visited.find(left) == visited.end())
-            left->debug(indent + "   ", visited);
-        visited.insert(this);
-        std::cout << indent << name << std::endl;
-        if (right && visited.find(right) == visited.end())
-            right->debug(indent + "   ", visited);
     }
 
     Rule &operator [](std::function<action_type> callable)
@@ -146,190 +98,244 @@ struct Rule
         return *this;
     }
 
-    Rule &operator ()(std::function<bool(match_type &)> callable)
+    Rule &operator ()(std::function<check_type> callable)
     {
         check = callable;
         return *this;
     }
+
+    std::shared_ptr<Rule> get_shared_ptr()
+    {
+        return this->shared_from_this();
+    }
 };
 
-template <typename Iterator>
-Rule<Iterator> &regex(const std::string &regex_string)
+template <typename Iterator, typename ActionType>
+class RuleResult
 {
-    Rule<Iterator> &rule = *new Rule<Iterator>("regex");
+    std::shared_ptr<Rule<Iterator, ActionType>> ptr;
+public:
+    RuleResult() { }
+    RuleResult(std::shared_ptr<Rule<Iterator, ActionType>> r_) : ptr(r_) { }
+    Rule<Iterator, ActionType> *operator ->()
+    {
+        return ptr.get();
+    }
+
+    const Rule<Iterator, ActionType> *operator ->() const
+    {
+        return ptr.get();
+    }
+};
+
+// This walks children who have not matched, and therefore end hasn't
+// propagated, we it's necessary to go get it.
+template <typename Iterator, typename ActionType>
+Match<Iterator, ActionType> right_most(Match<Iterator, ActionType> &m)
+{
+    if (m.children.empty())
+        return m;
+    return right_most(*m.children.back().get());
+}
+
+template <typename Iterator, typename ActionType>
+RuleResult<Iterator, ActionType> regex(const std::string &regex_string)
+{
+    typedef typename Rule<Iterator, ActionType>::match_type match_type;
+    std::shared_ptr<Rule<Iterator, ActionType>> rule(new Rule<Iterator, ActionType>("regex"));
     boost::xpressive::sregex regex = boost::xpressive::sregex::compile(regex_string);
-    rule.match_ = [&rule, regex, regex_string](Iterator token_pos, Iterator) -> typename Rule<Iterator>::rule_result { 
+    rule->match = [regex](Iterator token_pos, Iterator) -> typename Rule<Iterator, ActionType>::rule_result { 
         boost::xpressive::smatch what;
         std::string token_string = *token_pos;
         bool matched = boost::xpressive::regex_match(token_string, what, regex);
-        return typename Rule<Iterator>::rule_result(matched, matched ? ++token_pos : token_pos);
+        return std::make_shared<match_type>(matched, matched ? ++token_pos : token_pos);
     };
     return rule;
 }
 
-template <typename Iterator>
-Rule<Iterator> &terminal(int id)
+template <typename Iterator, typename ActionType>
+RuleResult<Iterator, ActionType> terminal(int id)
 {
-    Rule<Iterator> &rule = *new Rule<Iterator>("terminal");
-    rule.match_ = [&rule, id](Iterator token_pos, Iterator) -> typename Rule<Iterator>::rule_result {
+    typedef typename Rule<Iterator, ActionType>::match_type match_type;
+    std::shared_ptr<Rule<Iterator, ActionType>> rule(new Rule<Iterator, ActionType>("terminal"));
+    rule->match = [id](Iterator token_pos, Iterator) -> typename Rule<Iterator, ActionType>::rule_result {
         bool matched = (token_pos.token == id);
-        return typename Rule<Iterator>::rule_result(matched, matched ? ++token_pos : token_pos);
+        std::cout << token_pos.token << " == " << id << " ? " << matched << std::endl;
+        return std::make_shared<match_type>(matched, matched ? ++token_pos : token_pos);
     };
     return rule;
 }
 
 // non-terminals propagate info from their children
-template <typename Iterator>
-void propagate_child_info(RuleResult<Iterator> &ret, const RuleResult<Iterator> &child)
+template <typename Iterator, typename ActionType>
+void propagate_child_info(Match<Iterator, ActionType> &ret, std::shared_ptr<Match<Iterator, ActionType>> child)
 {
-    ret.matched = child.matched;
-    ret.match.end = child.match.end;
-    ret.match.children.push_back(std::make_shared<Match<Iterator>>(child.match));
+    ret.matched = child->matched;
+    ret.end = child->end;
+    ret.children.push_back(child->get_shared_ptr());
 }
 
 // Ordering this >> that
-template <typename Iterator>
-Rule<Iterator> &operator >>(Rule<Iterator> &first, Rule<Iterator> &second)
+template <typename Iterator, typename ActionType>
+RuleResult<Iterator, ActionType> operator >>(RuleResult<Iterator, ActionType> first, 
+                                             RuleResult<Iterator, ActionType> second)
 {
-    Rule<Iterator> &rule = *new Rule<Iterator>("order", &first, &second);
-    rule.must_consume_token = first.must_consume_token || second.must_consume_token;
-    rule.match_ = [&rule](Iterator token_pos, Iterator eos) -> typename Rule<Iterator>::rule_result 
+    typedef typename Rule<Iterator, ActionType>::match_type match_type;
+    std::shared_ptr<Rule<Iterator, ActionType>> rule(new Rule<Iterator, ActionType>("order"));
+    rule->must_consume_token = first->must_consume_token || second->must_consume_token;
+    rule->match = [first, second](Iterator token_pos, Iterator eos) -> typename Rule<Iterator, ActionType>::rule_result 
     {
-        typename Rule<Iterator>::rule_result ret, tmp;
-        tmp = rule.left->match(token_pos, eos);
+        typename Rule<Iterator, ActionType>::match_type ret(eos);
+        typename Rule<Iterator, ActionType>::rule_result tmp = first->get_match(token_pos, eos);
         propagate_child_info(ret, tmp);
-        if (tmp.matched) {
-            tmp = rule.right->match(tmp.match.end, eos);
+        if (tmp->matched) {
+            tmp = second->get_match(tmp->end, eos);
             propagate_child_info(ret, tmp);
-            if (!tmp.matched) {
-                    ret.match.end = token_pos;
+            if (!tmp->matched) {
+                ret.end = token_pos;
             }
         }
-        return ret;
+        return std::make_shared<match_type>(ret);
     };
     return rule;
 }
 
 // Select this | that
-template <typename Iterator>
-Rule<Iterator> &operator |(Rule<Iterator> &first, Rule<Iterator> &second)
+template <typename Iterator, typename ActionType>
+RuleResult<Iterator, ActionType> operator |(RuleResult<Iterator, ActionType> first, 
+                                            RuleResult<Iterator, ActionType> second)
 {
-    Rule<Iterator> &rule = *new Rule<Iterator>("or", &first, &second);
-    rule.must_consume_token = first.must_consume_token || second.must_consume_token;
-    rule.match_ = [&rule](Iterator token_pos, Iterator eos) -> typename Rule<Iterator>::rule_result 
+    typedef typename Rule<Iterator, ActionType>::match_type match_type;
+    std::shared_ptr<Rule<Iterator, ActionType>> rule(new Rule<Iterator, ActionType>("or"));
+    rule->must_consume_token = first->must_consume_token || second->must_consume_token;
+    rule->match = [first, second](Iterator token_pos, Iterator eos) -> typename Rule<Iterator, ActionType>::rule_result 
     { 
-        typename Rule<Iterator>::rule_result ret, tmpl, tmpr;
-        tmpl = rule.left->match(token_pos, eos);
+        typename Rule<Iterator, ActionType>::match_type ret(eos);
+        typename Rule<Iterator, ActionType>::rule_result tmpl, tmpr;
+        tmpl = first->get_match(token_pos, eos);
         // TODO: if both fail should we propagate all the child info? 
         // Just the failure with the most children?
-        if (tmpl.matched) {
+        if (tmpl->matched) {
+            std::cout << tmpl->name << " matched " << vemaparse::to_string(*tmpl) << std::endl;
             propagate_child_info(ret, tmpl);
-            return ret;
+            return std::make_shared<match_type>(ret);
         }
-        tmpr = rule.right->match(token_pos, eos);
-        if (tmpr.matched) {
+        std::cout << tmpl->name << " no match " << *token_pos << std::endl;
+        tmpr = second->get_match(token_pos, eos);
+        if (tmpr->matched) {
+            std::cout << tmpr->name << " matched " << vemaparse::to_string(*tmpr) << std::endl;
             propagate_child_info(ret, tmpr);
-            return ret;
+            return std::make_shared<match_type>(ret);
         }
 
         // Didn't match, see which match got further
-        typename Iterator::difference_type ld = right_most(tmpl.match).end - token_pos;
-        typename Iterator::difference_type lr = right_most(tmpr.match).end - token_pos;
+        typename Iterator::difference_type ld = right_most(*tmpl).end - token_pos;
+        typename Iterator::difference_type lr = right_most(*tmpr).end - token_pos;
         if (ld < lr) {
             propagate_child_info(ret, tmpr);
         } else {
             propagate_child_info(ret, tmpl);
         }
-        return ret;
+        return std::make_shared<match_type>(ret);
     };
     return rule;
 }
 
 // Kleene Star
-template <typename Iterator>
-Rule<Iterator> &operator *(Rule<Iterator> &first)
+template <typename Iterator, typename ActionType>
+RuleResult<Iterator, ActionType> operator *(RuleResult<Iterator, ActionType> first)
 {
-    Rule<Iterator> &rule = *new Rule<Iterator>(std::string("kleene->")+first.name, &first);
-    rule.must_consume_token = false;
-    rule.match_ = [&rule](Iterator token_pos, Iterator eos) -> typename Rule<Iterator>::rule_result 
+    typedef typename Rule<Iterator, ActionType>::match_type match_type;
+    std::shared_ptr<Rule<Iterator, ActionType>> rule(new Rule<Iterator, ActionType>(std::string("kleene->")+first->name));
+    rule->must_consume_token = false;
+    rule->match = [first](Iterator token_pos, Iterator eos) -> typename Rule<Iterator, ActionType>::rule_result 
     {
-        typename Rule<Iterator>::rule_result ret, tmp;
-        ret.match.end = tmp.match.end = token_pos;
-        tmp.matched = true;
-        while (tmp.match.end != eos && tmp.matched) {
-            tmp = rule.left->match(tmp.match.end, eos);
+        typename Rule<Iterator, ActionType>::match_type ret(eos);
+        typename Rule<Iterator, ActionType>::rule_result tmp;
+        ret.end = token_pos;
+        Iterator tmp_pos = token_pos;
+        bool tmp_matched = true;
+        while (tmp_pos != eos && tmp_matched) {
+            tmp = first->get_match(tmp_pos, eos);
             propagate_child_info(ret, tmp);
+            tmp_pos = tmp->end;
+            tmp_matched = tmp->matched;
         }
         ret.matched = true;
-        return ret;
+        return std::make_shared<match_type>(ret);
     };
     return rule;
 }
 
 // Non-greedy kleene star
-template <typename Iterator>
-Rule<Iterator> &operator /(Rule<Iterator> &first, Rule<Iterator> &second)
+template <typename Iterator, typename ActionType>
+RuleResult<Iterator, ActionType> operator /(RuleResult<Iterator, ActionType> first, 
+                                            RuleResult<Iterator, ActionType> second)
 {
-    Rule<Iterator> &rule = *new Rule<Iterator>("non-greedy kleene", &first, &second);
-    rule.must_consume_token = first.must_consume_token || second.must_consume_token;
-    rule.match_ = [&rule](Iterator token_pos, Iterator eos) -> typename Rule<Iterator>::rule_result 
+    typedef typename Rule<Iterator, ActionType>::match_type match_type;
+    std::shared_ptr<Rule<Iterator, ActionType>> rule(new Rule<Iterator, ActionType>("non-greedy kleene"));
+    rule->must_consume_token = first->must_consume_token || second->must_consume_token;
+    rule->match = [first, second](Iterator token_pos, Iterator eos) -> typename Rule<Iterator, ActionType>::rule_result 
     {
-        typename Rule<Iterator>::rule_result ret, tmp;
+        typename Rule<Iterator, ActionType>::match_type ret(eos);
+        typename Rule<Iterator, ActionType>::rule_result tmp;
         ret.matched = true;
         bool matched_right_side = false;
-        tmp.match.end = token_pos;
-        while (tmp.match.end != eos) {
-            Iterator start_pos = tmp.match.end;
-            tmp = rule.right->match(start_pos, eos);
-            if (tmp.matched) {
+        Iterator tmp_pos = token_pos;
+        while (tmp_pos != eos) {
+            Iterator start_pos = tmp_pos;
+            tmp = second->get_match(start_pos, eos);
+            if (tmp->matched) {
                 propagate_child_info(ret, tmp);
                 matched_right_side = true;
                 break;
             }
-            tmp = rule.left->match(start_pos, eos);
+            tmp = first->get_match(start_pos, eos);
+            tmp_pos = tmp->end;
             propagate_child_info(ret, tmp);
-            // Sometimes optional or star can return true, but didn't consume
-            // anything. That means we'll loop forever.
-            if (!tmp.matched || (tmp.match.end == start_pos)) {
+            // Optional or star can return true, but didn't consume anything.
+            // That means we'll loop forever.
+            if (!tmp->matched || (tmp->end == start_pos)) {
                 break;
             }
         }
         if (!matched_right_side) {
             ret.matched = false;
-            ret.match.end = token_pos;
+            ret.end = token_pos;
         }
-        return ret;
+        return std::make_shared<match_type>(ret);
     };
     return rule;
 }
 
 // Optional this?
-template <typename Iterator>
-Rule<Iterator> &operator -(Rule<Iterator> &first)
+template <typename Iterator, typename ActionType>
+RuleResult<Iterator, ActionType> operator -(RuleResult<Iterator, ActionType> first)
 {
-    Rule<Iterator> &rule = *new Rule<Iterator>("optional", &first);
-    rule.must_consume_token = false;
-    rule.match_ = [&rule](Iterator token_pos, Iterator eos) -> typename Rule<Iterator>::rule_result 
+    typedef typename Rule<Iterator, ActionType>::match_type match_type;
+    std::shared_ptr<Rule<Iterator, ActionType>> rule(new Rule<Iterator, ActionType>("optional", &first));
+    rule->must_consume_token = false;
+    rule->match = [first](Iterator token_pos, Iterator eos) -> typename Rule<Iterator, ActionType>::rule_result 
     {
         if (token_pos == eos)
-            return typename Rule<Iterator>::rule_result(true, eos);
-        typename Rule<Iterator>::rule_result ret, tmp = rule.left->match(token_pos, eos);
+            return typename Rule<Iterator, ActionType>::match_type(true, eos);
+        typename Rule<Iterator, ActionType>::match_type ret, tmp = first->get_match(token_pos, eos);
         propagate_child_info(ret, tmp);
-        assert(ret.matched || (tmp.match.end == token_pos));
+        assert(ret.matched || (tmp->end == token_pos));
         ret.matched = true;
-        return ret;
+        return std::make_shared<match_type>(ret);
     };
     return rule;
 }
 
 // 1 or more
-template <typename Iterator>
-Rule<Iterator> &operator +(Rule<Iterator> &first)
+template <typename Iterator, typename ActionType>
+RuleResult<Iterator, ActionType> operator +(RuleResult<Iterator, ActionType> first)
 {
     return (first >> (*first));
 }
 
-} // namespace parser
-
+}
 
 #endif
+

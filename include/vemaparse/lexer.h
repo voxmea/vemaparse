@@ -32,6 +32,7 @@ enum Token
     OPEN_PAREN,
     CLOSE_PAREN,
     NUM_TOKENS,
+    COMMENT,
     INVALID = NUM_TOKENS
 };
 
@@ -157,6 +158,23 @@ private:
         }
 
         // TODO: handle preprocessor directives?
+
+        // single line comments
+        if (*cur == '/') {
+            Iterator begin_pos = cur++;
+            if (*cur == '/') {
+                while (cur != end_pos && *cur != '\n')
+                    ++cur;
+                Iterator end_pos = cur;
+                // consume the newline, but don't include it in the token
+                if (cur != end_pos)
+                    ++cur;
+                return LexerIterator<Iterator>(this, COMMENT, begin_pos, end_pos);
+            } else {
+                // Not a comment
+                cur = begin_pos;
+            }
+        }
 
         // quoted strings
         if (*cur == '"') {
