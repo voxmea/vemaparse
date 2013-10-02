@@ -160,7 +160,6 @@ RuleResult<Iterator, ActionType> terminal(int id)
     std::shared_ptr<Rule<Iterator, ActionType>> rule(new Rule<Iterator, ActionType>("terminal"));
     rule->match = [id](Iterator token_pos, Iterator) -> typename Rule<Iterator, ActionType>::rule_result {
         bool matched = (token_pos.token == id);
-        std::cout << token_pos.token << " == " << id << " ? " << matched << std::endl;
         return std::make_shared<match_type>(matched, matched ? ++token_pos : token_pos);
     };
     return rule;
@@ -216,14 +215,11 @@ RuleResult<Iterator, ActionType> operator |(RuleResult<Iterator, ActionType> fir
         // TODO: if both fail should we propagate all the child info? 
         // Just the failure with the most children?
         if (tmpl->matched) {
-            std::cout << tmpl->name << " matched " << vemaparse::to_string(*tmpl) << std::endl;
             propagate_child_info(ret, tmpl);
             return std::make_shared<match_type>(ret);
         }
-        std::cout << tmpl->name << " no match " << *token_pos << std::endl;
         tmpr = second->get_match(token_pos, eos);
         if (tmpr->matched) {
-            std::cout << tmpr->name << " matched " << vemaparse::to_string(*tmpr) << std::endl;
             propagate_child_info(ret, tmpr);
             return std::make_shared<match_type>(ret);
         }
