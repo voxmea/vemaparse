@@ -118,6 +118,21 @@ class RuleWrapper
 public:
     RuleWrapper() { }
     RuleWrapper(std::shared_ptr<Rule<Iterator, ActionType>> r_) : ptr(r_) { }
+
+    RuleWrapper &operator =(const RuleWrapper &other)
+    {
+        if (this == &other)
+            return *this;
+
+        if (ptr) {
+            *ptr = *other.ptr;
+            return *this;
+        }
+
+        ptr = other.ptr;
+        return *this;
+    }
+
     Rule<Iterator, ActionType> *operator ->()
     {
         return ptr.get();
