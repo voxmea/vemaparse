@@ -325,13 +325,14 @@ template <typename Iterator, typename ActionType>
 RuleWrapper<Iterator, ActionType> operator -(RuleWrapper<Iterator, ActionType> first)
 {
     typedef typename Rule<Iterator, ActionType>::match_type match_type;
-    std::shared_ptr<Rule<Iterator, ActionType>> rule(new Rule<Iterator, ActionType>("optional", &first));
+    std::shared_ptr<Rule<Iterator, ActionType>> rule(new Rule<Iterator, ActionType>("optional"));
     rule->must_consume_token = false;
     rule->match = [first](Iterator token_pos, Iterator eos) -> typename Rule<Iterator, ActionType>::rule_result 
     {
+        typename Rule<Iterator, ActionType>::match_type ret(eos);
         if (token_pos == eos)
-            return typename Rule<Iterator, ActionType>::match_type(true, eos);
-        typename Rule<Iterator, ActionType>::match_type ret, tmp = first->get_match(token_pos, eos);
+            return std::make_shared<match_type>(ret);
+        typename Rule<Iterator, ActionType>::rule_result tmp = first->get_match(token_pos, eos);
         propagate_child_info(ret, tmp);
         assert(ret.matched || (tmp->end == token_pos));
         ret.matched = true;
