@@ -4,21 +4,26 @@
 #include <fstream>
 #include <iomanip>
 #include <vector>
+#include <list>
 #include <vemaparse/lexer.h>
 #include <vemaparse/parser.h>
+#include <vemaparse/ast.h>
 
 struct Node;
 
 typedef lexer::Lexer<std::string::iterator> Lexer;
 typedef vemaparse::Match<Lexer::iterator, Node> Match;
-typedef vemaparse::RuleResult<Lexer::iterator, Node> Rule;
+typedef vemaparse::RuleWrapper<Lexer::iterator, Node> Rule;
 
 struct Node
 {
+    typedef std::shared_ptr<Node> node_ptr;
+    typedef std::list<std::shared_ptr<Node>>::iterator child_iterator_type;
+
     std::string name;
     std::string text;
-    typedef std::shared_ptr<Node> node_ptr;
-    std::deque<std::shared_ptr<Node>> children;
+    node_ptr parent;
+    std::list<std::shared_ptr<Node>> children;
     std::string debug(std::ostream &stream)
     {
         static uint64_t counter = 0;
@@ -45,7 +50,7 @@ struct Node
 
 Rule r(const std::string &regex, const std::string name = "")
 {
-    static auto regex_helper_action = [regex](Node &n){std::cout << "regex match " << regex << " -> " << n.text;};
+    auto regex_helper_action = [regex](Node &n){std::cout << "regex match " << regex << " -> " << n.text << std::endl;};
     auto rule = vemaparse::regex<Lexer::iterator, Node>(regex);
     if (!name.empty())
         rule->name = name;
@@ -109,14 +114,54 @@ void create_parse_tree(Match &match, Node::node_ptr parent)
         create_parse_tree(**c, node);
 }
 
+void visit_match(Match &match, Node::node_ptr parent, bool failed = false)
+{
+    const std::string &match_string = vemaparse::to_string(match);
+    if (match_string.empty() && !failed) {
+        return;
+    }
+
+    Node::node_ptr node = std::make_shared<Node>();
+    node->parent = parent;
+    node->name = match.name;
+    node->text = match_string;
+    parent->children.push_back(node);
+
+    for (auto c = match.children.begin(); c != match.children.end(); ++c) 
+        visit_match(**c, node, failed);
+
+    if (match.action) {
+        match.action(*node);
+    } else {
+        ast::skip_node(*node);
+    }
+}
+
 Rule grammar()
 {
     auto open_comment = r("/\\*.*");
     auto close_comment = r("[^\\\\]*\\*/");
     auto anything = r(".*");
-    Rule comment = +(t(lexer::COMMENT) | (open_comment >> (anything / close_comment)));
+    auto comment = (t(lexer::COMMENT) | (open_comment >> (anything / close_comment)));
     comment->name = "comment";
-    return comment;
+
+    auto id = t(lexer::IDENTIFIER);
+    id->name = "id";
+
+    auto semi = r(";");
+    semi->name = "semi";
+
+    auto include = r("#") >> r("include") >> (t(lexer::STRING_LITERAL) | (r("<") >> t(lexer::IDENTIFIER) >> r(">")));
+    include->name = "include";
+
+    auto keyword = r("int") | r("float") | r("double");
+    auto declaration = keyword >> id >> (anything / semi);
+
+    auto expression = vemaparse::RuleWrapper<Lexer::iterator, Node>::get_empty_rule();
+    auto subexpression = r("\\(") >> expression >> r("\\)");
+    expression = subexpression | anything;
+
+    return +(comment | include | declaration);
 }
 
 int main(int argc, char *argv[])
@@ -163,10 +208,25 @@ int main(int argc, char *argv[])
         std::cerr << "last end token " << *ret->end << std::endl;
     }
 
-    Node::node_ptr root = std::make_shared<Node>();
-    create_parse_tree(*ret, root);
-    std::ofstream ofs("parse.dot", std::ios::binary | std::ios::trunc);
-    ofs << "digraph html {\n";
-    root->debug(ofs);
-    ofs << "}";
+    {
+        Node::node_ptr root = std::make_shared<Node>();
+        create_parse_tree(*ret, root);
+        std::ofstream ofs("parse.dot", std::ios::binary | std::ios::trunc);
+        ofs << "digraph html {\n";
+        root->debug(ofs);
+        ofs << "}";
+    }
+
+    {
+        Node::node_ptr root = std::make_shared<Node>();
+        root->name = "root";
+        std::ofstream ofs;
+        ofs.open("ast.dot", std::ios::binary | std::ios::trunc);
+        ofs << "digraph html {\n";
+        std::for_each(ret->children.begin(), ret->children.end(),
+                      [&root, failed](Match::match_shared_ptr m) {visit_match(*m, root, failed);});
+        // ret.match.action(ret.match, *root);
+        root->debug(ofs);
+        ofs << "}";
+    }
 }

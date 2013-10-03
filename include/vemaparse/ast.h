@@ -235,6 +235,7 @@ inline bool to_number(const std::string &text, T &value)
     return true;
 }
 
+#if 0
 template <typename Match, typename Node>
 static void literal(Match &match, Node &node)
 {
@@ -316,6 +317,7 @@ inline std::string op_to_name(std::string op)
         return "minus";
     return "I DONT KNOW " + op;
 }
+#endif
 
 }
 

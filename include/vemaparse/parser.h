@@ -27,16 +27,17 @@ namespace vemaparse
 template <typename Iterator, typename ActionType>
 struct Match : std::enable_shared_from_this<Match<Iterator, ActionType>>
 {
+    typedef std::shared_ptr<Match> match_shared_ptr;
     bool matched;
     std::string name;
     Iterator begin, end;
     std::function<void(ActionType &)> action;
-    std::deque<std::shared_ptr<Match>> children;
+    std::deque<match_shared_ptr> children;
 
     Match(Iterator end_) : matched(false), end(end_) { }
     Match(bool matched_, Iterator end_) : matched(matched_), end(end_) { }
 
-    std::shared_ptr<Match> get_shared_ptr() {return this->shared_from_this();}
+    match_shared_ptr get_shared_ptr() {return this->shared_from_this();}
 };
 
 template <typename Iterator, typename ActionType>
@@ -47,7 +48,7 @@ std::string to_string(const Match<Iterator, ActionType> &m)
     return ret;
 }
 
-template <typename Iterator, typename ActionType> class RuleResult;
+template <typename Iterator, typename ActionType> class RuleWrapper;
 
 template <typename Iterator, typename ActionType>
 struct Rule : std::enable_shared_from_this<Rule<Iterator, ActionType>>
@@ -111,12 +112,12 @@ struct Rule : std::enable_shared_from_this<Rule<Iterator, ActionType>>
 };
 
 template <typename Iterator, typename ActionType>
-class RuleResult
+class RuleWrapper
 {
     std::shared_ptr<Rule<Iterator, ActionType>> ptr;
 public:
-    RuleResult() { }
-    RuleResult(std::shared_ptr<Rule<Iterator, ActionType>> r_) : ptr(r_) { }
+    RuleWrapper() { }
+    RuleWrapper(std::shared_ptr<Rule<Iterator, ActionType>> r_) : ptr(r_) { }
     Rule<Iterator, ActionType> *operator ->()
     {
         return ptr.get();
@@ -125,6 +126,21 @@ public:
     const Rule<Iterator, ActionType> *operator ->() const
     {
         return ptr.get();
+    }
+
+    Rule<Iterator, ActionType> &operator [](typename Rule<Iterator, ActionType>::action_type action) 
+    {
+        return (*ptr)[action];
+    }
+
+    Rule<Iterator, ActionType> &operator ()(typename Rule<Iterator, ActionType>::check_type check)
+    {
+        return (*ptr)(check);
+    }
+
+    static RuleWrapper get_empty_rule()
+    {
+        return std::make_shared<Rule<Iterator, ActionType>>();
     }
 };
 
@@ -139,7 +155,7 @@ Match<Iterator, ActionType> right_most(Match<Iterator, ActionType> &m)
 }
 
 template <typename Iterator, typename ActionType>
-RuleResult<Iterator, ActionType> regex(const std::string &regex_string)
+RuleWrapper<Iterator, ActionType> regex(const std::string &regex_string)
 {
     typedef typename Rule<Iterator, ActionType>::match_type match_type;
     std::shared_ptr<Rule<Iterator, ActionType>> rule(new Rule<Iterator, ActionType>("regex"));
@@ -154,7 +170,7 @@ RuleResult<Iterator, ActionType> regex(const std::string &regex_string)
 }
 
 template <typename Iterator, typename ActionType>
-RuleResult<Iterator, ActionType> terminal(int id)
+RuleWrapper<Iterator, ActionType> terminal(int id)
 {
     typedef typename Rule<Iterator, ActionType>::match_type match_type;
     std::shared_ptr<Rule<Iterator, ActionType>> rule(new Rule<Iterator, ActionType>("terminal"));
@@ -176,8 +192,8 @@ void propagate_child_info(Match<Iterator, ActionType> &ret, std::shared_ptr<Matc
 
 // Ordering this >> that
 template <typename Iterator, typename ActionType>
-RuleResult<Iterator, ActionType> operator >>(RuleResult<Iterator, ActionType> first, 
-                                             RuleResult<Iterator, ActionType> second)
+RuleWrapper<Iterator, ActionType> operator >>(RuleWrapper<Iterator, ActionType> first, 
+                                             RuleWrapper<Iterator, ActionType> second)
 {
     typedef typename Rule<Iterator, ActionType>::match_type match_type;
     std::shared_ptr<Rule<Iterator, ActionType>> rule(new Rule<Iterator, ActionType>("order"));
@@ -201,8 +217,8 @@ RuleResult<Iterator, ActionType> operator >>(RuleResult<Iterator, ActionType> fi
 
 // Select this | that
 template <typename Iterator, typename ActionType>
-RuleResult<Iterator, ActionType> operator |(RuleResult<Iterator, ActionType> first, 
-                                            RuleResult<Iterator, ActionType> second)
+RuleWrapper<Iterator, ActionType> operator |(RuleWrapper<Iterator, ActionType> first, 
+                                            RuleWrapper<Iterator, ActionType> second)
 {
     typedef typename Rule<Iterator, ActionType>::match_type match_type;
     std::shared_ptr<Rule<Iterator, ActionType>> rule(new Rule<Iterator, ActionType>("or"));
@@ -239,7 +255,7 @@ RuleResult<Iterator, ActionType> operator |(RuleResult<Iterator, ActionType> fir
 
 // Kleene Star
 template <typename Iterator, typename ActionType>
-RuleResult<Iterator, ActionType> operator *(RuleResult<Iterator, ActionType> first)
+RuleWrapper<Iterator, ActionType> operator *(RuleWrapper<Iterator, ActionType> first)
 {
     typedef typename Rule<Iterator, ActionType>::match_type match_type;
     std::shared_ptr<Rule<Iterator, ActionType>> rule(new Rule<Iterator, ActionType>(std::string("kleene->")+first->name));
@@ -265,8 +281,8 @@ RuleResult<Iterator, ActionType> operator *(RuleResult<Iterator, ActionType> fir
 
 // Non-greedy kleene star
 template <typename Iterator, typename ActionType>
-RuleResult<Iterator, ActionType> operator /(RuleResult<Iterator, ActionType> first, 
-                                            RuleResult<Iterator, ActionType> second)
+RuleWrapper<Iterator, ActionType> operator /(RuleWrapper<Iterator, ActionType> first, 
+                                            RuleWrapper<Iterator, ActionType> second)
 {
     typedef typename Rule<Iterator, ActionType>::match_type match_type;
     std::shared_ptr<Rule<Iterator, ActionType>> rule(new Rule<Iterator, ActionType>("non-greedy kleene"));
@@ -306,7 +322,7 @@ RuleResult<Iterator, ActionType> operator /(RuleResult<Iterator, ActionType> fir
 
 // Optional this?
 template <typename Iterator, typename ActionType>
-RuleResult<Iterator, ActionType> operator -(RuleResult<Iterator, ActionType> first)
+RuleWrapper<Iterator, ActionType> operator -(RuleWrapper<Iterator, ActionType> first)
 {
     typedef typename Rule<Iterator, ActionType>::match_type match_type;
     std::shared_ptr<Rule<Iterator, ActionType>> rule(new Rule<Iterator, ActionType>("optional", &first));
@@ -326,7 +342,7 @@ RuleResult<Iterator, ActionType> operator -(RuleResult<Iterator, ActionType> fir
 
 // 1 or more
 template <typename Iterator, typename ActionType>
-RuleResult<Iterator, ActionType> operator +(RuleResult<Iterator, ActionType> first)
+RuleWrapper<Iterator, ActionType> operator +(RuleWrapper<Iterator, ActionType> first)
 {
     return (first >> (*first));
 }
