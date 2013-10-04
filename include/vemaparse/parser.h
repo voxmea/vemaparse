@@ -125,7 +125,9 @@ public:
             return *this;
 
         if (ptr) {
+            const std::string orig_name = ptr->name;
             *ptr = *other.ptr;
+            ptr->name = orig_name;
             return *this;
         }
 
@@ -143,14 +145,18 @@ public:
         return ptr.get();
     }
 
-    Rule<Iterator, ActionType> &operator [](typename Rule<Iterator, ActionType>::action_type action) 
+    template <typename T>
+    RuleWrapper &operator [](T action)
     {
-        return (*ptr)[action];
+        ptr->action = action;
+        return *this;
     }
 
-    Rule<Iterator, ActionType> &operator ()(typename Rule<Iterator, ActionType>::check_type check)
+    template <typename T>
+    RuleWrapper &operator ()(T check)
     {
-        return (*ptr)(check);
+        ptr->check = check;
+        return *this;
     }
 
     static RuleWrapper get_empty_rule()
@@ -192,6 +198,20 @@ RuleWrapper<Iterator, ActionType> terminal(int id)
     rule->match = [id](Iterator token_pos, Iterator) -> typename Rule<Iterator, ActionType>::rule_result {
         bool matched = (token_pos.token == id);
         return std::make_shared<match_type>(matched, matched ? ++token_pos : token_pos);
+    };
+    return rule;
+}
+
+template <typename Iterator, typename ActionType>
+RuleWrapper<Iterator, ActionType> newline(RuleWrapper<Iterator, ActionType> first)
+{
+    typedef typename Rule<Iterator, ActionType>::match_type match_type;
+    std::shared_ptr<Rule<Iterator, ActionType>> rule(new Rule<Iterator, ActionType>("newline"));
+    rule->match = [first](Iterator token_pos, Iterator eos) -> typename Rule<Iterator, ActionType>::rule_result {
+        token_pos.start_newline();
+        auto ret = first->get_match(token_pos, eos);
+        ret->end.stop_newline();
+        return ret;
     };
     return rule;
 }

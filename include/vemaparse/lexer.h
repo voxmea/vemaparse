@@ -57,9 +57,12 @@ struct LexerIterator : public std::iterator<std::forward_iterator_tag, Iterator>
     Iterator begin, end;
     Token token;
     bool is_end;
-    LexerIterator() : lexer(NULL), token(INVALID), is_end(true) { }
-    LexerIterator(const Lexer<Iterator> *lexer_, Token token_, Iterator begin_, Iterator end_) : lexer(lexer_), begin(begin_), end(end_), token(token_), is_end(false) { }
-    LexerIterator(const Lexer<Iterator> *lexer_, Iterator end_) : lexer(lexer_), begin(end_), end(end_), token(INVALID), is_end(true) { }
+    bool skip_nl;
+    LexerIterator() : lexer(NULL), token(INVALID), is_end(true), skip_nl(true) { }
+    LexerIterator(const Lexer<Iterator> *lexer_, Token token_, Iterator begin_, Iterator end_) 
+        : lexer(lexer_), begin(begin_), end(end_), token(token_), is_end(false), skip_nl(lexer->skip_nl)
+    { }
+    LexerIterator(const Lexer<Iterator> *lexer_, Iterator end_) : lexer(lexer_), begin(end_), end(end_), token(INVALID), is_end(true), skip_nl(true) { }
 
     LexerIterator &operator ++();
     LexerIterator operator ++(int);
@@ -77,7 +80,7 @@ struct LexerIterator : public std::iterator<std::forward_iterator_tag, Iterator>
         return std::string(buf.begin(), buf.end());
     }
 
-    bool operator==(const LexerIterator &other)
+    bool operator ==(const LexerIterator &other)
     {
         if (this == &other)
             return true;
@@ -87,7 +90,7 @@ struct LexerIterator : public std::iterator<std::forward_iterator_tag, Iterator>
         return this->begin == other.begin;
     }
 
-    bool operator!=(const LexerIterator &other)
+    bool operator !=(const LexerIterator &other)
     {
         return !(*this == other);
     }
@@ -95,6 +98,16 @@ struct LexerIterator : public std::iterator<std::forward_iterator_tag, Iterator>
     difference_type operator -(const LexerIterator &other)
     {
         return end - other.end;
+    }
+
+    void start_newline()
+    {
+        this->skip_nl = false;
+    }
+
+    void stop_newline()
+    {
+        this->skip_nl = true;
     }
 };
 
@@ -105,6 +118,7 @@ class Lexer
     Iterator begin_pos, end_pos;
     std::locale locale;
     bool skip_ws;
+    mutable bool skip_nl;
 
 private:
     LexerIterator<Iterator> next(const LexerIterator<Iterator> &iter) const
@@ -129,11 +143,17 @@ private:
 
         // space
         if (std::isspace(*cur, locale)) {
+            bool has_nl = (*cur == '\n');
             Iterator begin_pos = cur++;
-            while (cur != end_pos && std::isspace(*cur, locale))
+            while (cur != end_pos && std::isspace(*cur, locale)) {
+                has_nl = (*cur == '\n');
                 ++cur;
+            }
             if (!skip_ws)
                 return LexerIterator<Iterator>(this, WHITESPACE, begin_pos, cur);
+            if (!skip_nl && has_nl) {
+                return LexerIterator<Iterator>(this, WHITESPACE, begin_pos, cur);
+            }
         }
         if (cur == end_pos)
             return this->end();
@@ -224,7 +244,8 @@ private:
 public:
     typedef LexerIterator<Iterator> iterator;
     Lexer() { }
-    Lexer(Iterator begin_, Iterator end_, bool skip_ws_ = true) : begin_pos(begin_), end_pos(end_), skip_ws(skip_ws_) { }
+    Lexer(Iterator begin_, Iterator end_, bool skip_ws_ = true, bool skip_nl_ = true) 
+        : begin_pos(begin_), end_pos(end_), skip_ws(skip_ws_), skip_nl(skip_nl_) { }
 
     iterator begin() const
     {
@@ -240,6 +261,9 @@ public:
 template <typename Iterator>
 inline LexerIterator<Iterator> &LexerIterator<Iterator>::operator ++()
 {
+    if (this->skip_nl != this->lexer->skip_nl) {
+        this->lexer->skip_nl = this->skip_nl;
+    }
     *this = lexer->next(this->end);
     return *this;
 }
@@ -247,6 +271,9 @@ inline LexerIterator<Iterator> &LexerIterator<Iterator>::operator ++()
 template <typename Iterator>
 inline LexerIterator<Iterator> LexerIterator<Iterator>::operator ++(int)
 {
+    if (this->skip_nl != this->lexer->skip_nl) {
+        this->lexer->skip_nl = this->skip_nl;
+    }
     LexerIterator tmp = *this;
     *this = lexer->next(this->end);
     return tmp;
