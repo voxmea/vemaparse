@@ -11,7 +11,7 @@
 
 struct Node;
 
-typedef lexer::Lexer<std::string::iterator> Lexer;
+typedef vemalex::Lexer<std::string::iterator> Lexer;
 typedef vemaparse::Match<Lexer::iterator, Node> Match;
 typedef vemaparse::RuleWrapper<Lexer::iterator, Node> Rule;
 
@@ -142,16 +142,16 @@ Rule grammar()
     auto open_comment = r("/\\*.*");
     auto close_comment = r("[^\\\\]*\\*/");
     auto anything = r(".*");
-    auto comment = (t(lexer::COMMENT) | (open_comment >> (anything / close_comment)));
+    auto comment = (t(vemalex::COMMENT) | (open_comment >> (anything / close_comment)));
     comment->name = "comment";
 
-    auto id = t(lexer::IDENTIFIER);
+    auto id = t(vemalex::IDENTIFIER);
     id->name = "id";
 
     auto semi = r(";");
     semi->name = "semi";
 
-    auto include = r("#") >> r("include") >> (t(lexer::STRING_LITERAL) | (r("<") >> t(lexer::IDENTIFIER) >> r(">")));
+    auto include = r("#") >> r("include") >> (t(vemalex::STRING_LITERAL) | (r("<") >> t(vemalex::IDENTIFIER) >> r(">")));
     include->name = "include";
 
     auto keyword = r("int") | r("float") | r("double");
@@ -176,14 +176,14 @@ int main(int argc, char *argv[])
         ::exit(1);
     }
     std::string input = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-    lexer::Lexer<std::string::iterator> lexer = lexer::Lexer<std::string::iterator>(input.begin(), input.end());
+    vemalex::Lexer<std::string::iterator> lexer = vemalex::Lexer<std::string::iterator>(input.begin(), input.end());
     #if 1
     try {
         for (auto iter = lexer.begin(); iter != lexer.end(); ++iter) {
-            if (iter.token != lexer::WHITESPACE)
+            if (iter.token != vemalex::WHITESPACE)
                 std::cout << std::setw(2) << iter.token << ": " << *iter << std::endl;
         }
-    } catch (const lexer::LexerError &error) {
+    } catch (const vemalex::LexerError &error) {
         std::cerr << "ERROR: " << error.what() << std::endl;
     }
     #endif
@@ -201,7 +201,7 @@ int main(int argc, char *argv[])
             m = m->children.back();
         }
 
-        lexer::Lexer<std::string::iterator>::iterator lex_iter = m->end;
+        vemalex::Lexer<std::string::iterator>::iterator lex_iter = m->end;
         // get the line number
         std::string line_string = get_line(input.begin(), input.end(), lex_iter);
         std::cerr << "ERROR: failed to parse\n" << line_string << std::endl;

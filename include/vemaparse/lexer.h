@@ -16,7 +16,7 @@
 
 #define NUM_ELEM(x) (sizeof(x)/sizeof(x[0]))
 
-namespace lexer
+namespace vemalex
 {
 enum Token
 {

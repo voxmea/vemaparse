@@ -77,7 +77,7 @@ struct Rule : std::enable_shared_from_this<Rule<Iterator, ActionType>>
             // std::cout << depth++ << ":trying " << name << " on \"" << *token_pos << "\"" << std::endl;
             ret = match(token_pos, eos);
             // depth--;
-        } catch (const lexer::LexerError &ex) {
+        } catch (const vemalex::LexerError &ex) {
             std::cerr << "ERROR: " << ex.what() << std::endl;
             return std::make_shared<match_type>(false, token_pos);
         }
