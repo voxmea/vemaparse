@@ -125,9 +125,15 @@ public:
             return *this;
 
         if (ptr) {
-            const std::string orig_name = ptr->name;
-            *ptr = *other.ptr;
-            ptr->name = orig_name;
+            // NOTE: special handling for name, action, and check.
+            ptr->match = other->match;
+            ptr->must_consume_token = other->must_consume_token;
+            if (other->check)
+                ptr->check = other->check;
+            if (other->action)
+                ptr->action = other->action;
+            if (other->name.size())
+                ptr->name = other->name;
             return *this;
         }
 
