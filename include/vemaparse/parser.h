@@ -165,9 +165,14 @@ public:
         return *this;
     }
 
-    static RuleWrapper get_empty_rule()
+    static RuleWrapper create_empty_rule()
     {
         return std::make_shared<Rule<Iterator, ActionType>>();
+    }
+
+    static RuleWrapper clone_rule(const RuleWrapper &other)
+    {
+        return RuleWrapper(std::make_shared<Rule<Iterator, ActionType>>(*other.ptr));
     }
 };
 
