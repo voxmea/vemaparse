@@ -64,8 +64,17 @@ struct Rule : std::enable_shared_from_this<Rule<Iterator, ActionType>>
     std::function<rule_result(Iterator, Iterator)> match;
     bool must_consume_token;
 
-    Rule() { }
-    Rule(const std::string name_) : name(name_) { }
+    Rule() : must_consume_token(true) { }
+    Rule(const std::string name_) : name(name_), must_consume_token(true) { }
+
+    // Use this to break shared_ptr cycles
+    void reset()
+    {
+        name = "";
+        action = std::function<action_type>();
+        check = std::function<check_type>();
+        match = std::function<rule_result(Iterator, Iterator)>();
+    }
 
     rule_result get_match(Iterator token_pos, Iterator eos) const
     {
@@ -143,17 +152,20 @@ public:
 
     Rule<Iterator, ActionType> *operator ->()
     {
+        assert(ptr);
         return ptr.get();
     }
 
     const Rule<Iterator, ActionType> *operator ->() const
     {
+        assert(ptr);
         return ptr.get();
     }
 
     template <typename T>
     RuleWrapper &operator [](T action)
     {
+        assert(ptr);
         ptr->action = action;
         return *this;
     }
@@ -161,6 +173,7 @@ public:
     template <typename T>
     RuleWrapper &operator ()(T check)
     {
+        assert(ptr);
         ptr->check = check;
         return *this;
     }
