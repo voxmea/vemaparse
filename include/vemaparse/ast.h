@@ -235,25 +235,21 @@ inline bool to_number(const std::string &text, T &value)
     return true;
 }
 
-#if 0
-template <typename Match, typename Node>
-static void literal(Match &match, Node &node)
+template <typename Node>
+static void literal(vemalex::Token token_type, Node &node)
 {
-    int token = match.begin.token;
-    node.text = parser::to_string(match.begin, match.end);
-    node.type = Node::VALUE;
-    switch (token) {
-    case lexer::IDENTIFIER:
+    switch (token_type) {
+    case vemalex::IDENTIFIER:
         node.value = decltype(node.value)(node.text);
         node.name = "identifier";
         break;
 
-    case lexer::NUMBER_LITERAL:
+    case vemalex::NUMBER_LITERAL:
         node.name = "number";
         ::ast::to_number(node.text, node.value);
         break;
 
-    case lexer::STRING_LITERAL:
+    case vemalex::STRING_LITERAL:
     {
         node.name = "string";
         std::string s = boost::xpressive::regex_replace(node.text, boost::xpressive::sregex::compile("(?<!\\\\)\""), std::string());
@@ -317,7 +313,6 @@ inline std::string op_to_name(std::string op)
         return "minus";
     return "I DONT KNOW " + op;
 }
-#endif
 
 }
 
