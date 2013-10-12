@@ -157,11 +157,11 @@ Rule grammar()
     auto keyword = r("int") | r("float") | r("double");
     auto declaration = keyword >> id >> (anything / semi);
 
-    auto expression = vemaparse::RuleWrapper<Lexer::iterator, Node>::get_empty_rule();
+    auto expression = Rule::create_empty_rule();
     auto subexpression = r("\\(") >> expression >> r("\\)");
     expression = subexpression | anything;
 
-    return +(comment | include | declaration);
+    return +(comment | include | declaration | expression);
 }
 
 int main(int argc, char *argv[])
