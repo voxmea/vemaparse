@@ -58,7 +58,7 @@ Rule r(const std::string &regex, const std::string name = "")
     return rule;
 }
 
-Rule t(int id, const std::string name = "")
+Rule t(int id, const std::string name = "token")
 {
     auto rule = vemaparse::terminal<Lexer::iterator, Node>(id);
     if (!name.empty())
@@ -155,10 +155,14 @@ Rule grammar()
     include->name = "include";
 
     auto keyword = r("int") | r("float") | r("double");
+    keyword->name = "keyword";
     auto declaration = keyword >> id >> (anything / semi);
+    declaration->name = "declaration";
 
     auto expression = Rule::create_empty_rule();
+    expression->name = "expression";
     auto subexpression = r("\\(") >> expression >> r("\\)");
+    subexpression->name = "subexpression";
     expression = subexpression | anything;
 
     return +(comment | include | declaration | expression);
@@ -188,8 +192,17 @@ int main(int argc, char *argv[])
     }
     #endif
 
+    #if 0
+    for (int i = 0; i < 1000000; ++i) {
+        auto start = grammar();
+    }
+    printf("\n");
+    ::exit(0);
+    #endif
+
     auto start = grammar();
     auto ret = start->get_match(lexer.begin(), lexer.end());
+    start->reset();
     const bool failed = ret->end != lexer.end();
 
     if (failed) {

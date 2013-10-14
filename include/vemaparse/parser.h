@@ -130,15 +130,16 @@ public:
             return *this;
 
         if (ptr) {
-            // NOTE: special handling for name, action, and check.
             ptr->match = other->match;
             ptr->must_consume_token = other->must_consume_token;
+            ptr->children = other->children;
             if (other->check)
                 ptr->check = other->check;
             if (other->action)
                 ptr->action = other->action;
-            if (other->name.size())
+            if (other->name.size()) {
                 ptr->name = other->name;
+            }
             return *this;
         }
 
@@ -199,10 +200,12 @@ inline void Rule<Iterator, ActionType>::reset()
     action = std::function<action_type>();
     check = std::function<check_type>();
     match = std::function<rule_result(Iterator, Iterator)>();
-    for (auto iter = children.begin(); iter != children.end(); ++iter) {
+    // Don't want to recurse, so make a copy and then clear children before iterating.
+    auto children_copy = children;
+    children.clear();
+    for (auto iter = children_copy.begin(); iter != children_copy.end(); ++iter) {
         (*iter)->reset();
     }
-    children.clear();
 }
 
 // This walks children who have not matched, and therefore end hasn't
