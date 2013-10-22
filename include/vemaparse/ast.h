@@ -12,17 +12,19 @@
 #include <memory>
 #include <sstream>
 #include <stdint.h>
-#include <boost/xpressive/xpressive.hpp>
-#include <boost/variant.hpp>
 
 #ifdef _MSC_VER
-#pragma warning(push, 1)
-#pragma warning(disable:4702)
-#endif
+#include <regex>
+#define VEMA_RE_OBJ std::regex
+#define VEMA_RE_REPLACE std::regex_replace
+#define VEMA_RE_MATCH std::regex_match
+#define NEGATIVE_ASSERT "(?!"
+#else
 #include <boost/xpressive/xpressive.hpp>
-#ifdef _MSC_VER
-#pragma warning(default:4996)
-#pragma warning(pop)
+#define VEMA_RE_OBJ boost::xpressive::sregex::compile
+#define VEMA_RE_REPLACE boost::xpressive::regex_replace
+#define VEMA_RE_MATCH boost::xpressive::regex_match
+#define NEGATIVE_ASSERT "(?<!"
 #endif
 
 #include "lexer.h"
@@ -66,7 +68,7 @@ template <typename Node>
 std::string default_debug(std::ostream &stream, const Node &node)
 {
     static uint64_t counter = 0;
-    std::string name = boost::xpressive::regex_replace(node.name, boost::xpressive::sregex::compile(" |-|>|\n|\r|\\\\|\\(|\\)"), std::string("_"));
+    std::string name = VEMA_RE_REPLACE(node.name, VEMA_RE_OBJ(" |-|>|\n|\r|\\\\|\\(|\\)"), std::string("_"));
     {
         std::ostringstream ss;
         ss << name << counter++;
@@ -81,8 +83,8 @@ std::string default_debug(std::ostream &stream, const Node &node)
     } else if (!node.text.empty()) {
         label = ast::to_string<Node>(node.children.begin(), node.children.end());
     }
-    label = boost::xpressive::regex_replace(label, boost::xpressive::sregex::compile("(?<!\\\\)\""), std::string("\\\""));
-    label = boost::xpressive::regex_replace(label, boost::xpressive::sregex::compile("\n|\r"), std::string("_"));
+    label = VEMA_RE_REPLACE(label, VEMA_RE_OBJ(NEGATIVE_ASSERT"\\\\)\""), std::string("\\\""));
+    label = VEMA_RE_REPLACE(label, VEMA_RE_OBJ("\n|\r"), std::string("_"));
     stream << name << " [label=\"" << node.name << " - " << label << "\"];" << std::endl;
 
     std::vector<std::string> names;
@@ -166,12 +168,11 @@ void remove_terminals(Node &node)
 template <typename Node>
 void remove_terminals_match(Node &node, const std::string &regex_string)
 {
-    boost::xpressive::sregex regex = boost::xpressive::sregex::compile(regex_string);
+    auto re = VEMA_RE_OBJ(regex_string);
     typename Node::child_iterator_type iter;
     iter = node.children.begin();
     while (iter != node.children.end()) {
-        boost::xpressive::smatch what;
-        const bool matched = boost::xpressive::regex_match((*iter)->text, what, regex);
+        const bool matched = VEMA_RE_MATCH((*iter)->text, re);
         if (matched) {
             node.children.erase(iter++);
         } else {
@@ -184,12 +185,11 @@ template <typename Node>
 std::tuple<std::vector<typename Node::child_iterator_type>, std::vector<typename Node::child_iterator_type>>
 split_match(Node &node, const std::string &regex_string)
 {
-    boost::xpressive::sregex regex = boost::xpressive::sregex::compile(regex_string);
+    auto re = VEMA_RE_OBJ(regex_string);
     std::vector<typename Node::child_iterator_type> l, r;
     auto iter = node.children.begin();
     while (iter != node.children.end()) {
-        boost::xpressive::smatch what;
-        const bool matched = boost::xpressive::regex_match((*iter)->text, what, regex);
+        const bool matched = VEMA_RE_MATCH((*iter)->text, re);
         if (matched) {
             ++iter;
             break;
@@ -252,10 +252,10 @@ static void literal(vemalex::Token token_type, Node &node)
     case vemalex::STRING_LITERAL:
     {
         node.name = "string";
-        std::string s = boost::xpressive::regex_replace(node.text, boost::xpressive::sregex::compile("(?<!\\\\)\""), std::string());
-        s = boost::xpressive::regex_replace(s, boost::xpressive::sregex::compile("(?<!\\\\)\\\\\""), std::string("\""));
-        s = boost::xpressive::regex_replace(s, boost::xpressive::sregex::compile("(?<!\\\\)\\\\n"), std::string("\n"));
-        s = boost::xpressive::regex_replace(s, boost::xpressive::sregex::compile("(?<!\\\\)\\\\r"), std::string("\r"));
+        std::string s = VEMA_RE_REPLACE(node.text, VEMA_RE_OBJ(NEGATIVE_ASSERT"\\\\)\""), std::string());
+        s = VEMA_RE_REPLACE(s, VEMA_RE_OBJ(NEGATIVE_ASSERT"\\\\)\\\\\""), std::string("\""));
+        s = VEMA_RE_REPLACE(s, VEMA_RE_OBJ(NEGATIVE_ASSERT"\\\\)\\\\n"), std::string("\n"));
+        s = VEMA_RE_REPLACE(s, VEMA_RE_OBJ(NEGATIVE_ASSERT"\\\\)\\\\r"), std::string("\r"));
         node.value = decltype(node.value)(s);
         node.children.clear();
         break;

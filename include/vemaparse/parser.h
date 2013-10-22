@@ -12,13 +12,9 @@
 #include <memory>
 
 #ifdef _MSC_VER
-#pragma warning(push, 1)
-#pragma warning(disable:4702)
-#endif
+#include <regex>
+#else
 #include <boost/xpressive/xpressive.hpp>
-#ifdef _MSC_VER
-#pragma warning(default:4996)
-#pragma warning(pop)
 #endif
 
 namespace vemaparse
@@ -218,6 +214,21 @@ Match<Iterator, ActionType> right_most(Match<Iterator, ActionType> &m)
     return right_most(*m.children.back().get());
 }
 
+#ifdef _MSC_VER
+template <typename Iterator, typename ActionType>
+RuleWrapper<Iterator, ActionType> regex(const std::string &regex_string)
+{
+    typedef typename Rule<Iterator, ActionType>::match_type match_type;
+    std::shared_ptr<Rule<Iterator, ActionType>> rule(new Rule<Iterator, ActionType>("regex"));
+    std::regex re = std::regex(regex_string);
+    rule->match = [re](Iterator token_pos, Iterator) -> typename Rule<Iterator, ActionType>::rule_result { 
+        std::string token_string = *token_pos;
+        bool matched = std::regex_match(token_string, re);
+        return std::make_shared<match_type>(matched, matched ? ++token_pos : token_pos);
+    };
+    return rule;
+}
+#else
 template <typename Iterator, typename ActionType>
 RuleWrapper<Iterator, ActionType> regex(const std::string &regex_string)
 {
@@ -232,6 +243,7 @@ RuleWrapper<Iterator, ActionType> regex(const std::string &regex_string)
     };
     return rule;
 }
+#endif
 
 template <typename Iterator, typename ActionType>
 RuleWrapper<Iterator, ActionType> terminal(int id)
