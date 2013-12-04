@@ -53,6 +53,7 @@ struct Rule : std::enable_shared_from_this<Rule<Iterator, ActionType>>
     typedef std::shared_ptr<match_type> rule_result;
     typedef void action_type(ActionType &);
     typedef bool check_type(const match_type &);
+    typedef Iterator iterator;
 
     std::string name;
     std::function<action_type> action;
@@ -79,6 +80,7 @@ struct Rule : std::enable_shared_from_this<Rule<Iterator, ActionType>>
             // depth--;
         } catch (const vemalex::LexerError &ex) {
             std::cerr << "ERROR: " << ex.what() << std::endl;
+            // assert(0);
             return std::make_shared<match_type>(false, token_pos);
         }
         assert(ret->matched || ret->end == token_pos);
@@ -117,6 +119,9 @@ class RuleWrapper
     std::shared_ptr<Rule<Iterator, ActionType>> ptr;
 
 public:
+    typedef Iterator iterator;
+    typedef typename Rule<Iterator, ActionType>::rule_result rule_result;
+    typedef typename Rule<Iterator, ActionType>::match_type match_type;
     RuleWrapper() { }
     RuleWrapper(std::shared_ptr<Rule<Iterator, ActionType>> r_) : ptr(r_) { }
 
@@ -260,7 +265,6 @@ RuleWrapper<Iterator, ActionType> terminal(int id)
 template <typename Iterator, typename ActionType>
 RuleWrapper<Iterator, ActionType> newline(RuleWrapper<Iterator, ActionType> first)
 {
-    typedef typename Rule<Iterator, ActionType>::match_type match_type;
     std::shared_ptr<Rule<Iterator, ActionType>> rule(new Rule<Iterator, ActionType>("newline"));
     rule->match = [first](Iterator token_pos, Iterator eos) -> typename Rule<Iterator, ActionType>::rule_result {
         token_pos.start_newline();

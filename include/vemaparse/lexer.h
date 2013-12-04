@@ -7,6 +7,11 @@
 #include <exception>
 #include <set>
 #include <iterator>
+#include <cstddef>
+
+#ifdef HAS_IN_SITU_STRING
+#include <roanoke/in-situ-string.h>
+#endif
 
 #if defined(_MSC_VER)
 #define NOEXCEPT
@@ -33,6 +38,7 @@ enum Token
     CLOSE_PAREN,
     NUM_TOKENS,
     COMMENT,
+    UNKNOWN,
     INVALID = NUM_TOKENS
 };
 
@@ -49,10 +55,32 @@ struct LexerError : public std::exception
     }
 };
 
+namespace detail
+{
+    template <typename T>
+    struct GetDifferenceType
+    {
+        typedef typename T::difference_type difference_type;
+    };
+
+    template <>
+    struct GetDifferenceType<char *>
+    {
+        typedef std::ptrdiff_t difference_type;
+    };
+
+    template <>
+    struct GetDifferenceType<const char *>
+    {
+        typedef std::ptrdiff_t difference_type;
+    };
+}
+
 template <typename Iterator>
 struct LexerIterator : public std::iterator<std::forward_iterator_tag, Iterator>
 {
-    typedef typename Iterator::difference_type difference_type;
+    // typedef typename Iterator::difference_type difference_type;
+    typedef typename detail::GetDifferenceType<Iterator>::difference_type difference_type;
     const Lexer<Iterator> *lexer;
     Iterator begin, end;
     Token token;
@@ -67,6 +95,15 @@ struct LexerIterator : public std::iterator<std::forward_iterator_tag, Iterator>
     LexerIterator &operator ++();
     LexerIterator operator ++(int);
 
+#ifdef HAS_IN_SITU_STRING
+    roanoke::IS_String operator *() const
+    {
+        if (is_end) {
+            throw LexerError("dereferencing end iterator");
+        }
+        return roanoke::IS_String(begin, end);
+    }
+#else
     std::string operator *() const
     {
         if (is_end) {
@@ -79,6 +116,7 @@ struct LexerIterator : public std::iterator<std::forward_iterator_tag, Iterator>
             buf.push_back(*tmp++);
         return std::string(buf.begin(), buf.end());
     }
+#endif
 
     bool operator ==(const LexerIterator &other)
     {
@@ -118,9 +156,9 @@ class Lexer
     Iterator begin_pos, end_pos;
     std::locale locale;
     bool skip_ws;
+    bool return_unknown;
     mutable bool skip_nl;
 
-private:
     LexerIterator<Iterator> next(const LexerIterator<Iterator> &iter) const
     {
         if (iter.is_end)
@@ -128,24 +166,27 @@ private:
         return next(iter.end);
     }
 
+    bool is_special(char c) const
+    {
+        static const char specials_[] = "{}()[]#";
+        for (const char *s = specials_; *s; ++s)
+            if (c == *s) 
+                return true;
+        return false;
+    }
+
     LexerIterator<Iterator> next(const Iterator &start) const
     {
-        const char specials_[] = "{}()[]#";
-        const auto is_special = [&specials_](const char c) -> bool { 
-            for (const char *s = specials_; *s; ++s)
-                if (c == *s) 
-                    return true;
-            return false;
-        };
         Iterator cur = start, end_pos = this->end_pos;
-        if (cur == end_pos)
+        if (cur == end_pos) {
             return this->end();
+        }
 
         // space
         if (std::isspace(*cur, locale)) {
             bool has_nl = (*cur == '\n');
             Iterator begin_pos = cur++;
-            while (cur != end_pos && std::isspace(*cur, locale)) {
+            while ((cur != end_pos) && std::isspace(*cur, locale)) {
                 has_nl = (*cur == '\n');
                 ++cur;
             }
@@ -155,8 +196,9 @@ private:
                 return LexerIterator<Iterator>(this, WHITESPACE, begin_pos, cur);
             }
         }
-        if (cur == end_pos)
+        if (cur == end_pos) {
             return this->end();
+        }
 
         // scopes
         auto consume_single = [this, &cur](Token t) -> LexerIterator<Iterator> {Iterator begin_pos = cur++; return LexerIterator<Iterator>(this, t, begin_pos, cur); };
@@ -238,14 +280,19 @@ private:
             return LexerIterator<Iterator>(this, OPERATOR, begin_pos, cur);
         }
 
+        if (return_unknown) {
+            Iterator begin_pos = cur++;
+            return LexerIterator<Iterator>(this, UNKNOWN, begin_pos, cur);
+        }
+
         throw LexerError("unknown input type");
     }
 
 public:
     typedef LexerIterator<Iterator> iterator;
     Lexer() { }
-    Lexer(Iterator begin_, Iterator end_, bool skip_ws_ = true, bool skip_nl_ = true) 
-        : begin_pos(begin_), end_pos(end_), skip_ws(skip_ws_), skip_nl(skip_nl_) { }
+    Lexer(Iterator begin_, Iterator end_, bool skip_ws_ = true, bool skip_nl_ = true, bool return_unknown_ = false) 
+        : begin_pos(begin_), end_pos(end_), skip_ws(skip_ws_), return_unknown(return_unknown_), skip_nl(skip_nl_) { }
 
     iterator begin() const
     {
