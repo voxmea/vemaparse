@@ -118,7 +118,7 @@ struct LexerIterator : public std::iterator<std::forward_iterator_tag, Iterator>
     }
 #endif
 
-    bool operator ==(const LexerIterator &other)
+    bool operator ==(const LexerIterator &other) const
     {
         if (this == &other)
             return true;
@@ -128,12 +128,12 @@ struct LexerIterator : public std::iterator<std::forward_iterator_tag, Iterator>
         return this->begin == other.begin;
     }
 
-    bool operator !=(const LexerIterator &other)
+    bool operator !=(const LexerIterator &other) const
     {
         return !(*this == other);
     }
 
-    difference_type operator -(const LexerIterator &other)
+    difference_type operator -(const LexerIterator &other) const
     {
         return end - other.end;
     }
@@ -146,6 +146,11 @@ struct LexerIterator : public std::iterator<std::forward_iterator_tag, Iterator>
     void stop_newline()
     {
         this->skip_nl = true;
+    }
+
+    bool operator <(const LexerIterator &other) const
+    {
+        return end < other.end;
     }
 };
 

@@ -54,6 +54,7 @@ struct Rule : std::enable_shared_from_this<Rule<Iterator, ActionType>>
     typedef void action_type(ActionType &);
     typedef bool check_type(const match_type &);
     typedef Iterator iterator;
+    mutable std::map<Iterator, rule_result> cache;
 
     std::string name;
     std::function<action_type> action;
@@ -72,6 +73,8 @@ struct Rule : std::enable_shared_from_this<Rule<Iterator, ActionType>>
     {
         if (must_consume_token && token_pos == eos)
             return std::make_shared<match_type>(eos);
+        if (cache.find(token_pos) != cache.end())
+            return cache[token_pos];
         rule_result ret;
         try {
             // static int depth = 0;
@@ -92,6 +95,7 @@ struct Rule : std::enable_shared_from_this<Rule<Iterator, ActionType>>
             if (!ret->matched)
                 ret->end = token_pos;
         }
+        cache[token_pos] = ret;
         return ret;
     }
 
@@ -210,7 +214,7 @@ inline void Rule<Iterator, ActionType>::reset()
 }
 
 // This walks children who have not matched, and therefore end hasn't
-// propagated, we it's necessary to go get it.
+// propagated, therefore it's necessary to go get it.
 template <typename Iterator, typename ActionType>
 Match<Iterator, ActionType> right_most(Match<Iterator, ActionType> &m)
 {

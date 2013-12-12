@@ -27,7 +27,7 @@ struct Node
     std::string debug(std::ostream &stream)
     {
         static uint64_t counter = 0;
-        std::string name = boost::xpressive::regex_replace(this->name, boost::xpressive::sregex::compile(" |-|>|\n|\r|\\\\|\\(|\\)"), std::string("_"));
+        std::string name = std::regex_replace(this->name, std::regex(" |-|>|\n|\r|\\\\|\\(|\\)"), std::string("_"));
         {
             std::ostringstream ss;
             ss << name << counter++;
@@ -35,8 +35,8 @@ struct Node
         }
 
         std::string label = this->text;
-        label = boost::xpressive::regex_replace(label, boost::xpressive::sregex::compile("(?<!\\\\)\""), std::string("\\\""));
-        label = boost::xpressive::regex_replace(label, boost::xpressive::sregex::compile("\n|\r"), std::string("_"));
+        label = std::regex_replace(label, std::regex("(?!\\\\)\""), std::string("\\\""));
+        label = std::regex_replace(label, std::regex("\n|\r"), std::string("_"));
         stream << name << " [label=\"" << this->name << " - " << label << "\"];" << std::endl;
 
         std::vector<std::string> names;
@@ -165,7 +165,17 @@ Rule grammar()
     subexpression->name = "subexpression";
     expression = subexpression | anything;
 
-    return +(comment | include | declaration | expression);
+    auto block = Rule::create_empty_rule();
+    auto statement = Rule::create_empty_rule();
+    block = (r("\\{") >> r("\\}")) |
+            (r("\\{") >> (+statement) >> r("\\}"));
+
+    auto if_statement = (r("if") >> r("\\(") >> expression >> r("\\)") >> statement >> r("else") >> statement) |
+                        (r("if") >> r("\\(") >> expression >> r("\\)") >> statement);
+
+    statement = (expression >> r(";")) | block | if_statement;
+
+    return +(comment | include | declaration | statement);
 }
 
 int main(int argc, char *argv[])
