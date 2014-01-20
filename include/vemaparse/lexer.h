@@ -36,9 +36,9 @@ enum Token
     CLOSE_BRACKET,
     OPEN_PAREN,
     CLOSE_PAREN,
-    NUM_TOKENS,
     COMMENT,
     UNKNOWN,
+    NUM_TOKENS,
     INVALID = NUM_TOKENS
 };
 
