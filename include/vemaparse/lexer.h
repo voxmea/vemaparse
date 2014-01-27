@@ -192,7 +192,7 @@ class Lexer
             bool has_nl = (*cur == '\n');
             Iterator begin_pos = cur++;
             while ((cur != end_pos) && std::isspace(*cur, locale)) {
-                has_nl = (*cur == '\n');
+                has_nl = has_nl || (*cur == '\n');
                 ++cur;
             }
             if (!skip_ws)
