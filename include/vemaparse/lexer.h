@@ -11,6 +11,8 @@
 
 #ifdef HAS_IN_SITU_STRING
 #include <roanoke/in-situ-string.h>
+#else
+#include <vector>
 #endif
 
 #if defined(_MSC_VER)
