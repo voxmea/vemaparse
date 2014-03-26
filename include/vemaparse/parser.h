@@ -8,6 +8,7 @@
 #include <list>
 #include <map>
 #include <deque>
+#include <iterator>
 #include <algorithm>
 #include <memory>
 
@@ -78,6 +79,7 @@ struct Rule : std::enable_shared_from_this<Rule<Iterator, ActionType>>
         rule_result ret;
         try {
             // static int depth = 0;
+            // std::fill_n(std::ostream_iterator<char>(std::cout), depth, ' ');
             // std::cout << depth++ << ":trying " << name << " on \"" << *token_pos << "\"" << std::endl;
             ret = match(token_pos, eos);
             // depth--;
