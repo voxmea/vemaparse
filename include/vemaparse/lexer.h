@@ -234,11 +234,11 @@ class Lexer
             if (*cur == '/') {
                 while (cur != end_pos && *cur != '\n')
                     ++cur;
-                Iterator end_pos = cur;
+                Iterator local_end_pos = cur;
                 // consume the newline, but don't include it in the token
-                if (cur != end_pos)
+                if (cur != local_end_pos)
                     ++cur;
-                return LexerIterator<Iterator>(this, COMMENT, begin_pos, end_pos);
+                return LexerIterator<Iterator>(this, COMMENT, begin_pos, local_end_pos);
             } else {
                 // Not a comment
                 cur = begin_pos;
