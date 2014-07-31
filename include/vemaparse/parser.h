@@ -457,6 +457,25 @@ RuleWrapper<Iterator, ActionType> operator +(RuleWrapper<Iterator, ActionType> f
     return (first >> (*first));
 }
 
+// Not
+template <typename Iterator, typename ActionType>
+RuleWrapper<Iterator, ActionType> operator !(RuleWrapper<Iterator, ActionType> first)
+{
+    typedef typename Rule<Iterator, ActionType>::match_type match_type;
+    std::shared_ptr<Rule<Iterator, ActionType>> rule(new Rule<Iterator, ActionType>("not"));
+    rule->match = [first](Iterator token_pos, Iterator eos) -> typename Rule<Iterator, ActionType>::rule_result 
+    {
+        typename Rule<Iterator, ActionType>::match_type ret(eos);
+        if (token_pos == eos)
+            return std::make_shared<match_type>(ret);
+        typename Rule<Iterator, ActionType>::rule_result tmp = first->get_match(token_pos, eos);
+        const bool matched = !tmp->matched;
+        return std::make_shared<match_type>(matched, matched ? ++token_pos : token_pos);
+    };
+    rule->children.push_back(first);
+    return rule;
+}
+
 }
 
 #endif
