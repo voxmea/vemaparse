@@ -13,19 +13,11 @@
 #include <sstream>
 #include <stdint.h>
 
-#ifdef _MSC_VER
 #include <regex>
 #define VEMA_RE_OBJ std::regex
 #define VEMA_RE_REPLACE std::regex_replace
 #define VEMA_RE_MATCH std::regex_match
 #define NEGATIVE_ASSERT "(?!"
-#else
-#include <boost/xpressive/xpressive.hpp>
-#define VEMA_RE_OBJ boost::xpressive::sregex::compile
-#define VEMA_RE_REPLACE boost::xpressive::regex_replace
-#define VEMA_RE_MATCH boost::xpressive::regex_match
-#define NEGATIVE_ASSERT "(?<!"
-#endif
 
 #include "lexer.h"
 #include "parser.h"

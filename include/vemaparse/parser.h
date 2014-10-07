@@ -12,11 +12,7 @@
 #include <algorithm>
 #include <memory>
 
-#ifdef _MSC_VER
 #include <regex>
-#else
-#include <boost/xpressive/xpressive.hpp>
-#endif
 
 namespace vemaparse
 {
@@ -225,7 +221,6 @@ Match<Iterator, ActionType> right_most(Match<Iterator, ActionType> &m)
     return right_most(*m.children.back().get());
 }
 
-#ifdef _MSC_VER
 template <typename Iterator, typename ActionType>
 RuleWrapper<Iterator, ActionType> regex(const std::string &regex_string)
 {
@@ -239,22 +234,6 @@ RuleWrapper<Iterator, ActionType> regex(const std::string &regex_string)
     };
     return rule;
 }
-#else
-template <typename Iterator, typename ActionType>
-RuleWrapper<Iterator, ActionType> regex(const std::string &regex_string)
-{
-    typedef typename Rule<Iterator, ActionType>::match_type match_type;
-    std::shared_ptr<Rule<Iterator, ActionType>> rule(new Rule<Iterator, ActionType>("regex"));
-    boost::xpressive::sregex regex = boost::xpressive::sregex::compile(regex_string);
-    rule->match = [regex](Iterator token_pos, Iterator) -> typename Rule<Iterator, ActionType>::rule_result { 
-        boost::xpressive::smatch what;
-        std::string token_string = *token_pos;
-        bool matched = boost::xpressive::regex_match(token_string, what, regex);
-        return std::make_shared<match_type>(matched, matched ? ++token_pos : token_pos);
-    };
-    return rule;
-}
-#endif
 
 template <typename Iterator, typename ActionType>
 RuleWrapper<Iterator, ActionType> terminal(int id)

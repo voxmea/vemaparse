@@ -18,7 +18,9 @@
 #if defined(_MSC_VER)
 #define NOEXCEPT
 #else
+#ifndef NOEXCEPT
 #define NOEXCEPT noexcept
+#endif
 #endif
 
 #define NUM_ELEM(x) (sizeof(x)/sizeof(x[0]))
