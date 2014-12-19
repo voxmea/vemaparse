@@ -4,6 +4,7 @@
 
 #include <locale>
 #include <cassert>
+#include <cstdlib>
 #include <exception>
 #include <set>
 #include <iterator>
@@ -103,7 +104,8 @@ struct LexerIterator : public std::iterator<std::forward_iterator_tag, Iterator>
     roanoke::IS_String operator *() const
     {
         if (is_end) {
-            throw LexerError("dereferencing end iterator");
+            assert(false && "dereferencing end iterator");
+            std::abort();
         }
         return roanoke::IS_String(begin, end);
     }
@@ -111,7 +113,8 @@ struct LexerIterator : public std::iterator<std::forward_iterator_tag, Iterator>
     std::string operator *() const
     {
         if (is_end) {
-            throw LexerError("dereferencing end iterator");
+            assert(false && "dereferencing end iterator");
+            std::abort();
         }
         assert(begin != end);
         Iterator tmp = begin;
@@ -260,8 +263,11 @@ class Lexer
                     open_slash = false;
                 ++cur;
             }
-            if (cur == end_pos) 
+            if (cur == end_pos) {
+                // std::cerr << "ERROR: string literal not close\n";
+                // std::abort();
                 throw LexerError("string literal not closed");
+            }
             return LexerIterator<Iterator>(this, STRING_LITERAL, begin_pos, ++cur);
         }
 
