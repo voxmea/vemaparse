@@ -18,6 +18,8 @@
 
 #if defined(_MSC_VER)
 #define NOEXCEPT
+#pragma warning(push)
+#pragma warning(disable : 4458)
 #else
 #ifndef NOEXCEPT
 #define NOEXCEPT noexcept
@@ -342,6 +344,9 @@ inline LexerIterator<Iterator> LexerIterator<Iterator>::operator ++(int)
 }
 }
 
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 
 #endif
