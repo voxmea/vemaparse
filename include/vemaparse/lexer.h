@@ -8,6 +8,7 @@
 #include <set>
 #include <iterator>
 #include <cstddef>
+#include <ctype.h>
 
 #ifdef HAS_IN_SITU_STRING
 #include <roanoke/in-situ-string.h>
@@ -282,7 +283,7 @@ class Lexer
         // numbers - check for illegal numbers later
         if (::isdigit(*cur)) {
             Iterator begin_pos = cur++;
-            while (cur != end_pos && (::isxdigit(*cur) || (*cur == 'x') || (*cur == '.')))
+            while ((cur != end_pos) && (isxdigit(*cur) || (*cur == 'x') || (*cur == '.')))
                 ++cur;
             return LexerIterator<Iterator>(this, NUMBER_LITERAL, begin_pos, cur);
         }
