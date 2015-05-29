@@ -2,7 +2,6 @@
 #ifndef VEMAPARSE_LEXER_H_
 #define VEMAPARSE_LEXER_H_
 
-#include <locale>
 #include <cassert>
 #include <cstdlib>
 #include <exception>
@@ -168,7 +167,6 @@ class Lexer
 {
     template <typename> friend struct LexerIterator;
     Iterator begin_pos, end_pos;
-    std::locale locale;
     bool skip_ws;
     bool return_unknown;
     mutable bool skip_nl;
@@ -197,10 +195,10 @@ class Lexer
         }
 
         // space
-        if (std::isspace(*cur, locale)) {
+        if (::isspace(*cur)) {
             bool has_nl = (*cur == '\n');
             Iterator begin_pos = cur++;
-            while ((cur != end_pos) && std::isspace(*cur, locale)) {
+            while ((cur != end_pos) && ::isspace(*cur)) {
                 has_nl = has_nl || (*cur == '\n');
                 ++cur;
             }
@@ -274,25 +272,25 @@ class Lexer
         }
 
         // identifiers
-        if (std::isalpha(*cur, locale) || (*cur == '_')) {
+        if (::isalpha(*cur) || (*cur == '_')) {
             Iterator begin_pos = cur++;
-            while (cur != end_pos && (std::isalnum(*cur, locale) || (*cur == '_')))
+            while (cur != end_pos && (::isalnum(*cur) || (*cur == '_')))
                 ++cur;
             return LexerIterator<Iterator>(this, IDENTIFIER, begin_pos, cur);
         }
 
         // numbers - check for illegal numbers later
-        if (std::isdigit(*cur, locale)) {
+        if (::isdigit(*cur)) {
             Iterator begin_pos = cur++;
-            while (cur != end_pos && (std::isxdigit(*cur, locale) || (*cur == 'x') || (*cur == '.')))
+            while (cur != end_pos && (::isxdigit(*cur) || (*cur == 'x') || (*cur == '.')))
                 ++cur;
             return LexerIterator<Iterator>(this, NUMBER_LITERAL, begin_pos, cur);
         }
 
         // operators
-        if (std::ispunct(*cur, locale)) {
+        if (::ispunct(*cur)) {
             Iterator begin_pos = cur++;
-            while (cur != end_pos && std::ispunct(*cur, locale) && !is_special(*cur))
+            while (cur != end_pos && ::ispunct(*cur) && !is_special(*cur))
                 ++cur;
             return LexerIterator<Iterator>(this, OPERATOR, begin_pos, cur);
         }
