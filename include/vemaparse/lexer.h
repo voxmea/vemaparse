@@ -291,7 +291,7 @@ class Lexer
         // operators
         if (::ispunct(*cur)) {
             Iterator begin_pos = cur++;
-            while (cur != end_pos && ::ispunct(*cur) && !is_special(*cur))
+            while (cur != end_pos && (*cur != '"') && ::ispunct(*cur) && !is_special(*cur))
                 ++cur;
             return LexerIterator<Iterator>(this, OPERATOR, begin_pos, cur);
         }
